@@ -1,0 +1,11 @@
+# Testing and code coverage
+.nyc_output/
+node_modules/
+coverage/
+
+# VSCode
+.vscode/
+
+# Project files
+*.log
+logs/
