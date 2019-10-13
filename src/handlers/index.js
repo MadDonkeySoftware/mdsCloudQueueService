@@ -1,5 +1,12 @@
 const got = require('got');
 const repos = require('../repos');
+const { logger } = require('../globals');
+
+const delay = (ms) => new Promise((resolve) => {
+  setTimeout(() => {
+    resolve();
+  }, ms);
+});
 
 const sendResponse = (response, status, body) => {
   response.status(status || 200);
@@ -10,6 +17,7 @@ const sendResponse = (response, status, body) => {
 const listQueues = (request, response) => repos.listQueues().then((result) => {
   response.send(JSON.stringify(result));
 });
+
 const queueExists = (newName, queues) => queues.indexOf(newName) > -1;
 
 const createQueue = (request, response) => {
@@ -81,23 +89,59 @@ const getMessage = (request, response) => {
     });
 };
 
-const invokeResource = (qid) => repos.getValueForKey(`queue-meta:${qid}`)
-  .then((metadata) => {
-    if (metadata) {
-      const meta = JSON.parse(metadata);
-      const opts = {
-        headers: {
-          'content-type': 'application/json',
-        },
-        body: '{}',
-      };
+const invokeResourceFnProject = (url, bodyObject) => {
+  let body;
+  if (!bodyObject) {
+    body = '{}';
+  } else {
+    body = JSON.stringify(bodyObject);
+  }
+  const opts = {
+    headers: {
+      'content-type': 'application/json',
+    },
+    body,
+  };
 
-      if (meta.resource) {
-        // NOTE: the user doesn't care what the response is.
-        got.post(meta.resource, opts);
+  return got.post(url, opts);
+};
+
+const hasMetaAndNotEmpty = (qid) => Promise.all([repos.getQueueSize(qid), repos.getValueForKey(`queue-meta:${qid}`)])
+  .then((data) => {
+    if (data[0]) {
+      if (data[1]) {
+        const meta = JSON.parse(data[1]);
+        return meta.resource && meta.resource !== '';
       }
     }
+    return false;
+  });
 
+// TODO: Move this out into a worker than can be run stand alone.
+const invokeResourceUntilEmpty = (qid) => repos.acquireLock(`${qid}-lock`, 30 * 1000)
+  .then((release) => delay(1 * 1000)
+    .then(() => repos.getValueForKey(`queue-meta:${qid}`))
+    .then((metadata) => {
+      if (!metadata) { return Promise.resolve(); }
+
+      const meta = JSON.parse(metadata);
+      if (!meta.resource || process.env.DISABLE_FIRE_EVENTS) { return Promise.resolve(); }
+
+      return invokeResourceFnProject(meta.resource)
+        .then(() => Promise.resolve()) // causes http response to not bubble out
+        .catch((err) => {
+          if (err) {
+            process.stdout.write(`ERROR: ${err.message} when invoking ${meta.resource}\n`);
+          }
+          return Promise.resolve();
+        });
+    })
+    .finally(() => release()))
+  .then(() => hasMetaAndNotEmpty(qid))
+  .then((shouldRunAgain) => {
+    if (shouldRunAgain) {
+      return invokeResourceUntilEmpty(qid);
+    }
     return Promise.resolve();
   });
 
@@ -111,7 +155,7 @@ const createMessage = (request, response) => {
   // resource or incrementally invoking the resource with message batches while
   // the queue is above zero messages.
   return repos.createMessage(qid, message)
-    .then((id) => invokeResource(qid, id))
+    .then(() => { invokeResourceUntilEmpty(qid); })
     .then(() => sendResponse(response));
 };
 
@@ -120,7 +164,10 @@ const removeMessage = (request, response) => {
   const { qid, id } = params;
 
   return repos.removeMessage(qid, id)
-    .then((count) => sendResponse(response, count ? 200 : 404));
+    .then((count) => sendResponse(response, count ? 200 : 404))
+    .catch((err) => {
+      logger.error('Message remove failed', err, params);
+    });
 };
 
 

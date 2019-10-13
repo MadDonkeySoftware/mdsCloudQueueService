@@ -1,4 +1,5 @@
 const redis = require('redis');
+const redisLock = require('redis-lock');
 const RedisSMQ = require('rsmq');
 const util = require('util');
 const parseRedisUrl = require('parse-redis-url')(redis);
@@ -17,6 +18,7 @@ const queue = new RedisSMQ({
   ns,
 });
 
+const acquireLockPromise = util.promisify(redisLock(redisClient));
 
 const createQueuePromise = util.promisify(queue.createQueue);
 const listQueuesPromise = util.promisify(queue.listQueues);
@@ -66,6 +68,8 @@ const setValueForKey = (key, value) => setPromise(key, value);
 const getValueForKey = (key) => getPromise(key);
 const removeKey = (key) => delPromise(key);
 
+const acquireLock = (lockName, timeout) => acquireLockPromise(lockName, timeout);
+
 module.exports = {
   handleAppShutdown,
   listQueues,
@@ -79,4 +83,5 @@ module.exports = {
   setValueForKey,
   getValueForKey,
   removeKey,
+  acquireLock,
 };

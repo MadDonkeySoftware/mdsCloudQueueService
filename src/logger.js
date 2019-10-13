@@ -54,15 +54,14 @@ const buildLogger = (serviceName) => {
   // If we're not in production then **ALSO** log to the `console`
   // with the colorized simple format and a debug file for tail.
   //
+  logger.add(new transports.Console({
+    format: format.combine(
+      format.colorize(),
+      format.simple(),
+    ),
+  }));
   if (process.env.NODE_ENV !== 'production') {
     logger.level = 'verbose';
-    logger.add(new transports.Console({
-      format: format.combine(
-        format.colorize(),
-        format.simple(),
-      ),
-      level: 'silly',
-    }));
     logger.add(new transports.File(buildFileOptions({
       filename: './logs/quick-start-debug.log',
       format: format.simple(),

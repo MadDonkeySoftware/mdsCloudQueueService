@@ -17,6 +17,7 @@ const initializeRedis = () => {
   const setValueForKey = (key, value) => redis.setValueForKey(key, value);
   const getValueForKey = (key) => redis.getValueForKey(key);
   const removeKey = (key) => redis.removeKey(key);
+  const acquireLock = (lockName, timeout) => redis.acquireLock(lockName, timeout);
 
   return {
     handleAppShutdown,
@@ -31,6 +32,7 @@ const initializeRedis = () => {
     setValueForKey,
     getValueForKey,
     removeKey,
+    acquireLock,
   };
 };
 
