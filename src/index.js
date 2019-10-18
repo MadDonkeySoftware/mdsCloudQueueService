@@ -28,6 +28,7 @@ const configureRoutes = (expressApp) => {
   expressApp.post('/queue', handlers.createQueue); // create new queue
   expressApp.post('/queue/:id', handlers.updateQueue); // update a queue
   expressApp.delete('/queue/:id', handlers.removeQueue); // deletes a queue from the system
+  expressApp.get('/queue/:id/details', handlers.getQueueDetails); // gets the metadata associated with the queue
   expressApp.get('/queue/:qid/length', handlers.getMessageCount); // get the count of messages in a queue
   expressApp.get('/queue/:qid/message', handlers.getMessage); // get a message from the queue
   expressApp.post('/queue/:qid/message', handlers.createMessage); // send a message to the queue

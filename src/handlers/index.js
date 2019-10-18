@@ -1,12 +1,9 @@
+const _ = require('lodash');
 const got = require('got');
 const repos = require('../repos');
 const { logger } = require('../globals');
 
-const delay = (ms) => new Promise((resolve) => {
-  setTimeout(() => {
-    resolve();
-  }, ms);
-});
+const wait = (ms) => new Promise((resolve) => { setTimeout(() => { resolve(); }, ms); });
 
 const sendResponse = (response, status, body) => {
   response.status(status || 200);
@@ -44,11 +41,13 @@ const updateQueue = (request, response) => {
   const { resource } = body;
   const { id } = params;
 
-  const queueMeta = JSON.stringify({
-    resource,
-  });
-
-  return repos.setValueForKey(`queue-meta:${id}`, queueMeta)
+  const mergeWithFilter = (a, b) => (b === undefined ? a : undefined);
+  const metaKey = `queue-meta:${id}`;
+  return repos.getValueForKey(metaKey)
+    .then((currentMeta) => JSON.parse(currentMeta))
+    .then((currentMeta) => _.mergeWith({}, currentMeta, { resource }, mergeWithFilter))
+    .then((newMeta) => _.pickBy(newMeta, _.identity))
+    .then((newMeta) => repos.setValueForKey(metaKey, JSON.stringify(newMeta)))
     .then(() => sendResponse(response));
 };
 
@@ -62,6 +61,15 @@ const removeQueue = (request, response) => {
     .then((queues) => queueExists(id, queues))
     .then((exists) => exists && deleteQueue())
     .then((deleted) => sendResponse(response, deleted ? 204 : 404));
+};
+
+const getQueueDetails = (request, response) => {
+  const { params } = request;
+  const { id } = params;
+
+  return repos.getValueForKey(`queue-meta:${id}`)
+    .then((metadata) => metadata || '{}')
+    .then((metadata) => sendResponse(response, 200, metadata));
 };
 
 const getMessageCount = (request, response) => {
@@ -107,10 +115,10 @@ const invokeResourceFnProject = (url, bodyObject) => {
 };
 
 const hasMetaAndNotEmpty = (qid) => Promise.all([repos.getQueueSize(qid), repos.getValueForKey(`queue-meta:${qid}`)])
-  .then((data) => {
-    if (data[0]) {
-      if (data[1]) {
-        const meta = JSON.parse(data[1]);
+  .then(([size, metadata]) => {
+    if (size > 0) {
+      if (metadata) {
+        const meta = JSON.parse(metadata);
         return meta.resource && meta.resource !== '';
       }
     }
@@ -119,7 +127,7 @@ const hasMetaAndNotEmpty = (qid) => Promise.all([repos.getQueueSize(qid), repos.
 
 // TODO: Move this out into a worker than can be run stand alone.
 const invokeResourceUntilEmpty = (qid) => repos.acquireLock(`${qid}-lock`, 30 * 1000)
-  .then((release) => delay(1 * 1000)
+  .then((release) => wait(3 * 1000)
     .then(() => repos.getValueForKey(`queue-meta:${qid}`))
     .then((metadata) => {
       if (!metadata) { return Promise.resolve(); }
@@ -138,12 +146,7 @@ const invokeResourceUntilEmpty = (qid) => repos.acquireLock(`${qid}-lock`, 30 * 
     })
     .finally(() => release()))
   .then(() => hasMetaAndNotEmpty(qid))
-  .then((shouldRunAgain) => {
-    if (shouldRunAgain) {
-      return invokeResourceUntilEmpty(qid);
-    }
-    return Promise.resolve();
-  });
+  .then((shouldRunAgain) => (shouldRunAgain ? invokeResourceUntilEmpty(qid) : Promise.resolve()));
 
 const createMessage = (request, response) => {
   const { body, params } = request;
@@ -176,6 +179,7 @@ module.exports = {
   createQueue,
   updateQueue,
   removeQueue,
+  getQueueDetails,
   getMessageCount,
   getMessage,
   createMessage,
