@@ -1,9 +1,10 @@
 const _ = require('lodash');
-const got = require('got');
+const express = require('express');
 const repos = require('../repos');
-const { logger } = require('../globals');
+const globals = require('../globals');
+const resourceInvoker = require('./resource_invoker');
 
-const wait = (ms) => new Promise((resolve) => { setTimeout(() => { resolve(); }, ms); });
+const router = express.Router();
 
 const sendResponse = (response, status, body) => {
   response.status(status || 200);
@@ -11,9 +12,8 @@ const sendResponse = (response, status, body) => {
   return Promise.resolve();
 };
 
-const listQueues = (request, response) => repos.listQueues().then((result) => {
-  response.send(JSON.stringify(result));
-});
+const listQueues = (request, response) => repos.listQueues()
+  .then((result) => sendResponse(response, 200, JSON.stringify(result)));
 
 const queueExists = (newName, queues) => queues.indexOf(newName) > -1;
 
@@ -84,6 +84,7 @@ const getMessageCount = (request, response) => {
 const getMessage = (request, response) => {
   const { params } = request;
   const { qid } = params;
+  const logger = globals.getLogger();
 
   return repos.getMessage(qid)
     .then((message) => sendResponse(response, 200, message))
@@ -93,60 +94,10 @@ const getMessage = (request, response) => {
         return;
       }
 
-      throw err;
+      logger.warn({ err }, 'Error occurred while attempting to get queue message.');
+      sendResponse(response, 500);
     });
 };
-
-const invokeResourceFnProject = (url, bodyObject) => {
-  let body;
-  if (!bodyObject) {
-    body = '{}';
-  } else {
-    body = JSON.stringify(bodyObject);
-  }
-  const opts = {
-    headers: {
-      'content-type': 'application/json',
-    },
-    body,
-  };
-
-  return got.post(url, opts);
-};
-
-const hasMetaAndNotEmpty = (qid) => Promise.all([repos.getQueueSize(qid), repos.getValueForKey(`queue-meta:${qid}`)])
-  .then(([size, metadata]) => {
-    if (size > 0) {
-      if (metadata) {
-        const meta = JSON.parse(metadata);
-        return meta.resource && meta.resource !== '';
-      }
-    }
-    return false;
-  });
-
-// TODO: Move this out into a worker than can be run stand alone.
-const invokeResourceUntilEmpty = (qid) => repos.acquireLock(`${qid}-lock`, 30 * 1000)
-  .then((release) => wait(3 * 1000)
-    .then(() => repos.getValueForKey(`queue-meta:${qid}`))
-    .then((metadata) => {
-      if (!metadata) { return Promise.resolve(); }
-
-      const meta = JSON.parse(metadata);
-      if (!meta.resource || process.env.DISABLE_FIRE_EVENTS) { return Promise.resolve(); }
-
-      return invokeResourceFnProject(meta.resource)
-        .then(() => Promise.resolve()) // causes http response to not bubble out
-        .catch((err) => {
-          if (err) {
-            process.stdout.write(`ERROR: ${err.message} when invoking ${meta.resource}\n`);
-          }
-          return Promise.resolve();
-        });
-    })
-    .finally(() => release()))
-  .then(() => hasMetaAndNotEmpty(qid))
-  .then((shouldRunAgain) => (shouldRunAgain ? invokeResourceUntilEmpty(qid) : Promise.resolve()));
 
 const createMessage = (request, response) => {
   const { body, params } = request;
@@ -158,30 +109,30 @@ const createMessage = (request, response) => {
   // resource or incrementally invoking the resource with message batches while
   // the queue is above zero messages.
   return repos.createMessage(qid, message)
-    .then(() => { invokeResourceUntilEmpty(qid); })
+    .then(() => { resourceInvoker.invokeResourceUntilEmpty(qid); })
     .then(() => sendResponse(response));
 };
 
 const removeMessage = (request, response) => {
   const { params } = request;
   const { qid, id } = params;
+  const logger = globals.getLogger();
 
   return repos.removeMessage(qid, id)
     .then((count) => sendResponse(response, count ? 200 : 404))
     .catch((err) => {
-      logger.error('Message remove failed', err, params);
+      logger.error({ err, params }, 'Message remove failed');
     });
 };
 
+router.get('/queues', listQueues); // get list of queues
+router.post('/queue', createQueue); // create new queue
+router.post('/queue/:id', updateQueue); // update a queue
+router.delete('/queue/:id', removeQueue); // deletes a queue from the system
+router.get('/queue/:id/details', getQueueDetails); // gets the metadata associated with the queue
+router.get('/queue/:qid/length', getMessageCount); // get the count of messages in a queue
+router.get('/queue/:qid/message', getMessage); // get a message from the queue
+router.post('/queue/:qid/message', createMessage); // send a message to the queue
+router.delete('/queue/:qid/message/:id', removeMessage); // deletes a message from the system
 
-module.exports = {
-  listQueues,
-  createQueue,
-  updateQueue,
-  removeQueue,
-  getQueueDetails,
-  getMessageCount,
-  getMessage,
-  createMessage,
-  removeMessage,
-};
+module.exports = router;

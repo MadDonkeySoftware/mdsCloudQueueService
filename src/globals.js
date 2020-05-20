@@ -1,19 +1,47 @@
-const logger = require('./logger');
+const bunyan = require('bunyan');
+const bunyanLogstashHttp = require('./bunyan-logstash-http');
+
+const buildLogStreams = () => {
+  const loggerMetadata = { fromLocal: process.env.DEBUG };
+  const logStreams = [];
+
+  if (!/test/.test(process.env.NODE_ENV)) {
+    logStreams.push({
+      stream: process.stdout,
+    });
+  }
+
+  if (process.env.MDS_LOG_URL) {
+    logStreams.push(
+      {
+        stream: bunyanLogstashHttp.createLoggerStream({
+          loggingEndpoint: process.env.MDS_LOG_URL,
+          level: 'debug',
+          metadata: loggerMetadata,
+        }),
+      },
+    );
+  }
+
+  return logStreams;
+};
+
+const logger = bunyan.createLogger({
+  name: 'yeoman test dir',
+  level: bunyan.TRACE,
+  serializers: bunyan.stdSerializers,
+  streams: buildLogStreams(),
+});
 
 /**
  * returns the current logger for the application
  */
-const activeLogger = logger.buildLogger();
-
-/**
- * Promise wrapper around process.nextTick
- */
-const nextTick = () => new Promise((resolve) => process.nextTick(resolve));
+const getLogger = () => logger;
 
 const delay = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
 
 module.exports = {
-  logger: activeLogger,
-  nextTick,
+  buildLogStreams,
+  getLogger,
   delay,
 };
