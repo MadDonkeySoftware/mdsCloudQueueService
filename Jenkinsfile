@@ -22,8 +22,8 @@ pipeline {
         stage('Publish') {
             when { branch 'master' }
             steps {
-                sh 'docker build -t 192.168.5.90:5000/frito/mds-cloud-queue-service:latest .'
-                sh 'docker push 192.168.5.90:5000/frito/mds-cloud-queue-service:latest'
+                sh 'docker build -t 192.168.5.90:5000/frito/mds-queue-service:latest .'
+                sh 'docker push 192.168.5.90:5000/frito/mds-queue-service:latest'
             }
         }
     }
