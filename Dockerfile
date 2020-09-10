@@ -8,4 +8,4 @@ RUN npm install --only=prod
 COPY . .
 EXPOSE 8888
 
-CMD [ "node", "./src/index.js" ]
+CMD [ "node", "./bin/server" ]

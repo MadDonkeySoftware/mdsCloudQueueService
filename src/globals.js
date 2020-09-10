@@ -27,7 +27,7 @@ const buildLogStreams = () => {
 };
 
 const logger = bunyan.createLogger({
-  name: 'yeoman test dir',
+  name: 'mdsCloudQueueService',
   level: bunyan.TRACE,
   serializers: bunyan.stdSerializers,
   streams: buildLogStreams(),

@@ -1,6 +1,7 @@
 const supertest = require('supertest');
 const sinon = require('sinon');
 const chai = require('chai');
+const orid = require('@maddonkeysoftware/orid-node');
 
 const repos = require('../repos');
 const appShutdown = require('./app_shutdown');
@@ -26,7 +27,7 @@ const getStubbedRepo = () => ({
   releaseLock: sinon.stub(repos, 'releaseLock'),
 });
 
-describe('src/handlers/index', () => {
+describe('src/handlers/v2', () => {
   beforeEach(() => {
     sinon.stub(appShutdown, 'wire');
   });
@@ -35,39 +36,56 @@ describe('src/handlers/index', () => {
     sinon.restore();
   });
 
+  const createExpectedOrid = (resourceId, resourceRider) => orid.v1.generate({
+    provider: process.env.MDS_QS_PROVIDER_KEY,
+    service: 'qs',
+    custom3: 1, // TODO: Update after handling account
+    resourceId,
+    resourceRider,
+  });
+
   it('lists queues when queried', () => {
     // Arrange
     const app = src.buildApp();
     const repoStubs = getStubbedRepo();
-    repoStubs.listQueues.resolves(['one', 'two', 'three']);
+    repoStubs.listQueues.resolves(['orid_1_mdsCloud___1_qs_one', 'orid_1_mdsCloud___1_qs_two', 'orid_1_mdsCloud___1_qs_three']);
 
     // Act / Assert
     return supertest(app)
-      .get('/queues')
+      .get('/v2/queues')
       .expect('content-type', /application\/json/)
-      .expect(200, ['one', 'two', 'three']);
+      .expect(200, [
+        { name: 'one', orid: 'orid:1:mdsCloud:::1:qs:one' },
+        { name: 'two', orid: 'orid:1:mdsCloud:::1:qs:two' },
+        { name: 'three', orid: 'orid:1:mdsCloud:::1:qs:three' },
+      ]);
   });
 
   describe('creates queue', () => {
+    const buildQueueName = (name) => `orid_1_${process.env.MDS_QS_PROVIDER_KEY || ''}___1_qs_${name}`;
+
     it('when queue does not exist it creates a queue', () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves(['one', 'two', 'three']);
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
       return supertest(app)
-        .post('/queue')
+        .post('/v2/queue')
         .send({ name: 'test', resource: 'http://127.0.0.1/abc/invoke' })
-        .expect(201)
+        .expect(201, {
+          name: 'test',
+          orid: createExpectedOrid('test'),
+        })
         .then(() => {
           chai.expect(repoStubs.createQueue.callCount).to.equal(1);
-          chai.expect(repoStubs.createQueue.firstCall.args[0]).to.equal('test');
+          chai.expect(repoStubs.createQueue.firstCall.args[0]).to.equal(buildQueueName('test'));
           chai.expect(repoStubs.createQueue.firstCall.args[1]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[2]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[3]).to.equal();
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:test');
+          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal(`queue-meta:${buildQueueName('test')}`);
           chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
             resource: 'http://127.0.0.1/abc/invoke',
           }));
@@ -78,14 +96,33 @@ describe('src/handlers/index', () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves(['one', 'two', 'three', 'test']);
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('test')]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
       return supertest(app)
-        .post('/queue')
+        .post('/v2/queue')
         .send({ name: 'test' })
-        .expect(204);
+        .expect(200, {
+          name: 'test',
+          orid: createExpectedOrid('test'),
+        });
+    });
+
+    it('when queue name invalid it does not creates a queue', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('test')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v2/queue')
+        .send({ name: 'test_queue' })
+        .expect(400, {
+          message: 'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
+        });
     });
   });
 
@@ -98,11 +135,11 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .post('/queue/test')
+        .post('/v2/queue/orid:1:mdsCloud:::1:qs:test')
         .send({ resource: 'http://127.0.0.1/abc/invoke' })
         .expect(200)
         .then(() => {
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:test');
+          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1_qs_test');
           chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
             other: 'value',
             resource: 'http://127.0.0.1/abc/invoke',
@@ -118,14 +155,29 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .post('/queue/test')
+        .post('/v2/queue/orid:1:mdsCloud:::1:qs:test')
         .send({ resource: null })
         .expect(200)
         .then(() => {
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:test');
+          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1_qs_test');
           chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
             other: 'value',
           }));
+        });
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v2/queue/test')
+        .send({ resource: null })
+        .expect(400)
+        .then(() => {
+          chai.expect(repoStubs.setValueForKey.callCount).to.eql(0);
         });
     });
   });
@@ -137,15 +189,15 @@ describe('src/handlers/index', () => {
       const repoStubs = getStubbedRepo();
       repoStubs.removeQueue.resolves(1);
       repoStubs.removeKey.resolves(true);
-      repoStubs.listQueues.resolves(['test']);
+      repoStubs.listQueues.resolves(['orid_1_mdsCloud___1_qs_test']);
 
       // Act / Assert
       return supertest(app)
-        .delete('/queue/test')
+        .delete('/v2/queue/orid:1:mdsCloud:::1:qs:test')
         .expect(204)
         .then(() => {
-          chai.expect(repoStubs.removeQueue.firstCall.args[0]).to.equal('test');
-          chai.expect(repoStubs.removeKey.firstCall.args[0]).to.equal('queue-meta:test');
+          chai.expect(repoStubs.removeQueue.firstCall.args[0]).to.equal('orid_1_mdsCloud___1_qs_test');
+          chai.expect(repoStubs.removeKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1_qs_test');
         });
     });
 
@@ -157,8 +209,23 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .delete('/queue/test')
+        .delete('/v2/queue/orid:1:mdsCloud:::1:qs:test')
         .expect(404)
+        .then(() => {
+          chai.expect(repoStubs.removeQueue.callCount).to.equal(0);
+          chai.expect(repoStubs.removeKey.callCount).to.equal(0);
+        });
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+
+      // Act / Assert
+      return supertest(app)
+        .delete('/v2/queue/test')
+        .expect(400)
         .then(() => {
           chai.expect(repoStubs.removeQueue.callCount).to.equal(0);
           chai.expect(repoStubs.removeKey.callCount).to.equal(0);
@@ -176,8 +243,10 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/details')
-        .expect(200, {});
+        .get('/v2/queue/orid:1:mdsCloud:::1:qs:test/details')
+        .expect(200, {
+          orid: 'orid:1:mdsCloud:::1:qs:test',
+        });
     });
 
     it('returns queue details when queue exists with metadata', () => {
@@ -189,8 +258,21 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/details')
-        .expect(200, { resource: 'resource' });
+        .get('/v2/queue/orid:1:mdsCloud:::1:qs:test/details')
+        .expect(200, {
+          orid: 'orid:1:mdsCloud:::1:qs:test',
+          resource: 'resource',
+        });
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+
+      // Act / Assert
+      return supertest(app)
+        .get('/v2/queue/test/details')
+        .expect(400);
     });
   });
 
@@ -204,8 +286,11 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/length')
-        .expect(200, { size: 11 });
+        .get('/v2/queue/orid:1:mdsCloud:::1:qs:test/length')
+        .expect(200, {
+          size: 11,
+          orid: 'orid:1:mdsCloud:::1:qs:test',
+        });
     });
 
     it('returns 404 when queue does not exist', () => {
@@ -217,8 +302,18 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test3/length')
+        .get('/v2/queue/orid:1:mdsCloud:::1:qs:test3/length')
         .expect(404);
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+
+      // Act / Assert
+      return supertest(app)
+        .get('/v2/queue/test/length')
+        .expect(400);
     });
   });
 
@@ -231,7 +326,7 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/message')
+        .get('/v2/message/orid:1:mdsCloud:::1:qs:test')
         .expect(200, { id: 1 });
     });
 
@@ -243,7 +338,7 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/message')
+        .get('/v2/message/orid:1:mdsCloud:::1:qs:test')
         .expect(404);
     });
 
@@ -256,8 +351,18 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .get('/queue/test/message')
+        .get('/v2/message/orid:1:mdsCloud:::1:qs:test')
         .expect(500);
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+
+      // Act / Assert
+      return supertest(app)
+        .get('/v2/message/test')
+        .expect(400);
     });
   });
 
@@ -272,9 +377,25 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .post('/queue/test/message')
+        .post('/v2/message/orid:1:mdsCloud:::1:qs:test')
         .send({ key: 'testMessage' })
         .expect(200);
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+
+      // Act / Assert
+      return supertest(app)
+        .get('/v2/message/test')
+        .expect(400)
+        .then(() => {
+          chai.expect(repoStubs.createMessage.callCount).to.equal(0);
+          chai.expect(invokerStub.callCount).to.equal(0);
+        });
     });
   });
 
@@ -289,7 +410,7 @@ describe('src/handlers/index', () => {
 
       // Act / Assert
       return supertest(app)
-        .delete('/queue/test/message/123')
+        .delete('/v2/message/orid:1:mdsCloud:::1:qs:test/123')
         .expect(200);
     });
 
@@ -298,17 +419,66 @@ describe('src/handlers/index', () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.removeMessage.resolves(0);
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty');
-      invokerStub.returns();
+      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
 
       // Act / Assert
       return supertest(app)
-        .delete('/queue/test/message/123')
-        .expect(404);
+        .delete('/v2/message/orid:1:mdsCloud:::1:qs:test/123')
+        .expect(404)
+        .then(() => {
+          chai.expect(repoStubs.removeMessage.callCount).to.equal(1);
+          chai.expect(invokerStub.callCount).to.equal(0);
+        });
+    });
+
+    it('bad request when orid does not include message id (missing sub path)', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.removeMessage.resolves(0);
+      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+
+      // Act / Assert
+      return supertest(app)
+        .delete('/v2/message/orid:1:mdsCloud:::1:qs:test')
+        .expect(400)
+        .then(() => {
+          chai.expect(repoStubs.removeMessage.callCount).to.equal(0);
+          chai.expect(invokerStub.callCount).to.equal(0);
+        });
+    });
+
+    it('bad request when orid does not include message id (including sub path)', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.removeMessage.resolves(0);
+      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+
+      // Act / Assert
+      return supertest(app)
+        .delete('/v2/message/orid:1:mdsCloud:::1:qs:test/')
+        .expect(400)
+        .then(() => {
+          chai.expect(repoStubs.removeMessage.callCount).to.equal(0);
+          chai.expect(invokerStub.callCount).to.equal(0);
+        });
+    });
+
+    it('returns bad request when orid not provided', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+
+      // Act / Assert
+      return supertest(app)
+        .delete('/v2/message/test')
+        .expect(400)
+        .then(() => {
+          chai.expect(repoStubs.removeMessage.callCount).to.equal(0);
+          chai.expect(invokerStub.callCount).to.equal(0);
+        });
     });
   });
-
-  /*
-router.delete('/queue/:qid/message/:id', removeMessage); // deletes a message from the system
-  */
 });
