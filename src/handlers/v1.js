@@ -1,40 +1,42 @@
 const _ = require('lodash');
 const express = require('express');
 const orid = require('@maddonkeysoftware/orid-node');
+
 const repos = require('../repos');
 const globals = require('../globals');
+const handlerHelpers = require('./handler-helpers');
 const resourceInvoker = require('./resource_invoker');
 
 const router = express.Router();
 
 const oridBase = {
-  provider: process.env.MDS_QS_PROVIDER_KEY,
-  custom3: 1, // TODO: Implement account
+  provider: handlerHelpers.getIssuer(),
   service: 'qs',
 };
 
-const makeOrid = (name) => orid.v1.generate(_.merge({}, oridBase, {
+const makeOrid = (name, accountId) => orid.v1.generate(_.merge({}, oridBase, {
   resourceId: name,
+  custom3: accountId,
 }));
 
-const oridToRepoName = (inOrid) => (orid.v1.isValid(inOrid) ? inOrid.replace(/:/g, '_') : inOrid);
+const oridToRepoName = (inOrid) => inOrid.replace(/:/g, '_');
 const repoNameToOrid = (inName) => inName.replace(/_/g, ':');
 
-const sendResponse = (response, status, body) => {
-  response.status(status || 200);
-  response.send(body);
-  return Promise.resolve();
+const listQueues = (request, response) => {
+  const accountId = _.get(request, ['parsedToken', 'payload', 'accountId']);
+  return repos.listQueues()
+    .then((results) => results.map((e) => {
+      const parsedOrid = orid.v1.parse(repoNameToOrid(e));
+      return parsedOrid.custom3 !== accountId
+        ? undefined
+        : ({
+          name: parsedOrid.resourceId,
+          orid: repoNameToOrid(e),
+        });
+    }))
+    .then((results) => _.filter(results, (e) => !!e))
+    .then((result) => handlerHelpers.sendResponse(response, 200, JSON.stringify(result)));
 };
-
-const listQueues = (request, response) => repos.listQueues()
-  .then((results) => results.map((e) => {
-    const parsedOrid = orid.v1.parse(repoNameToOrid(e));
-    return {
-      name: parsedOrid.resourceId,
-      orid: repoNameToOrid(e),
-    };
-  }))
-  .then((result) => sendResponse(response, 200, JSON.stringify(result)));
 
 const queueExists = (newName, queues) => queues.indexOf(newName) > -1;
 
@@ -46,16 +48,17 @@ const createQueue = (request, response) => {
   const queueMeta = JSON.stringify({
     resource,
   });
+  const accountId = _.get(request, ['parsedToken', 'payload', 'accountId']);
 
   const nameRegex = /^[a-zA-Z0-9-]*$/;
   if (!nameRegex.test(name) || name.length > 50) {
-    sendResponse(response, 400, JSON.stringify({
+    handlerHelpers.sendResponse(response, 400, JSON.stringify({
       message: 'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
     }));
     return Promise.resolve();
   }
 
-  const newOrid = makeOrid(name);
+  const newOrid = makeOrid(name, accountId);
   const escapedName = oridToRepoName(newOrid);
 
   const newQueue = (newName, size, mdelay, visTimeout) => (
@@ -71,20 +74,20 @@ const createQueue = (request, response) => {
   return repos.listQueues()
     .then((queues) => queueExists(escapedName, queues))
     .then((exists) => !exists && newQueue(escapedName, maxSize, delay, vt))
-    .then((created) => sendResponse(response, created ? 201 : 200, JSON.stringify(respObj)))
+    .then((created) => handlerHelpers.sendResponse(response,
+      created ? 201 : 200,
+      JSON.stringify(respObj)))
     .catch((err) => {
       logger.error({ err }, 'Failed to create queue.');
-      sendResponse(response, 500);
+      handlerHelpers.sendResponse(response, 500);
     });
 };
 
 const updateQueue = (request, response) => {
-  const { body, params } = request;
+  const { body } = request;
   const { resource } = body;
-  const { id } = params;
-
-  if (!orid.v1.isValid(id)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(id);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
 
   const mergeWithFilter = (a, b) => (b === undefined ? a : undefined);
   const metaKey = `queue-meta:${escapedName}`;
@@ -93,14 +96,12 @@ const updateQueue = (request, response) => {
     .then((currentMeta) => _.mergeWith({}, currentMeta, { resource }, mergeWithFilter))
     .then((newMeta) => _.pickBy(newMeta, _.identity))
     .then((newMeta) => repos.setValueForKey(metaKey, JSON.stringify(newMeta)))
-    .then(() => sendResponse(response));
+    .then(() => handlerHelpers.sendResponse(response));
 };
 
 const removeQueue = (request, response) => {
-  const { id } = request.params;
-  if (!orid.v1.isValid(id)) sendResponse(response, 400);
-
-  const escapedName = oridToRepoName(id);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
 
   const deleteQueue = () => repos.removeQueue(escapedName)
     .then(() => repos.removeKey(`queue-meta:${escapedName}`));
@@ -108,15 +109,13 @@ const removeQueue = (request, response) => {
   return repos.listQueues()
     .then((queues) => queueExists(escapedName, queues))
     .then((exists) => exists && deleteQueue())
-    .then((deleted) => sendResponse(response, deleted ? 204 : 404));
+    .then((deleted) => handlerHelpers.sendResponse(response, deleted ? 204 : 404));
 };
 
 const getQueueDetails = (request, response) => {
-  const { params } = request;
-  const { id } = params;
-
-  if (!orid.v1.isValid(id)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(id);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const queueOrid = orid.v1.generate(reqOrid);
+  const escapedName = oridToRepoName(queueOrid);
 
   return repos.getValueForKey(`queue-meta:${escapedName}`)
     .then((metadata) => metadata || '{}')
@@ -125,55 +124,50 @@ const getQueueDetails = (request, response) => {
       return JSON.stringify(_.merge(
         {},
         meta,
-        { orid: id },
+        { orid: queueOrid },
       ));
     })
-    .then((metadata) => sendResponse(response, 200, metadata));
+    .then((metadata) => handlerHelpers.sendResponse(response, 200, metadata));
 };
 
 const getMessageCount = (request, response) => {
-  const { params } = request;
-  const { qid } = params;
-
-  if (!orid.v1.isValid(qid)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(qid);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const queueOrid = orid.v1.generate(reqOrid);
+  const escapedName = oridToRepoName(queueOrid);
 
   return repos.getQueueSize(escapedName)
-    .then((size) => sendResponse(response, 200, JSON.stringify({
+    .then((size) => handlerHelpers.sendResponse(response, 200, JSON.stringify({
       size,
-      orid: qid,
+      orid: queueOrid,
     })))
-    .catch(() => sendResponse(response, 404));
+    .catch(() => handlerHelpers.sendResponse(response, 404));
 };
 
 const getMessage = (request, response) => {
-  const { params } = request;
-  const { qid } = params;
   const logger = globals.getLogger();
 
-  if (!orid.v1.isValid(qid)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(qid);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
 
   return repos.getMessage(escapedName)
-    .then((message) => sendResponse(response, 200, message))
+    .then((message) => handlerHelpers.sendResponse(response, 200, message))
     .catch((err) => {
       if (err.name === 'queueNotFound') {
-        sendResponse(response, 404);
+        handlerHelpers.sendResponse(response, 404);
         return;
       }
 
       logger.warn({ err }, 'Error occurred while attempting to get queue message.');
-      sendResponse(response, 500);
+      handlerHelpers.sendResponse(response, 500);
     });
 };
 
 const createMessage = (request, response) => {
-  const { body, params } = request;
-  const { qid } = params;
+  const { body } = request;
   const message = JSON.stringify(body);
 
-  if (!orid.v1.isValid(qid)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(qid);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
 
   // TODO: Research if resource defined skip queue and invoke directly is option
   // May want to also entertain batching messages before sending them to defined
@@ -181,32 +175,31 @@ const createMessage = (request, response) => {
   // the queue is above zero messages.
   return repos.createMessage(escapedName, message)
     .then(() => { resourceInvoker.invokeResourceUntilEmpty(escapedName); })
-    .then(() => sendResponse(response));
+    .then(() => handlerHelpers.sendResponse(response));
 };
 
 const removeMessage = (request, response) => {
   const { params } = request;
-  const { qid, id } = params;
   const logger = globals.getLogger();
 
-  if (!orid.v1.isValid(qid)) sendResponse(response, 400);
-  const escapedName = oridToRepoName(qid);
+  const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
+  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
 
-  return repos.removeMessage(escapedName, id)
-    .then((count) => sendResponse(response, count ? 200 : 404))
+  return repos.removeMessage(escapedName, reqOrid.resourceRider)
+    .then((count) => handlerHelpers.sendResponse(response, count ? 200 : 404))
     .catch((err) => {
       logger.error({ err, params }, 'Message remove failed');
     });
 };
 
-router.get('/queues', listQueues); // get list of queues
-router.post('/queue', createQueue); // create new queue
-router.post('/queue/:id', updateQueue); // update a queue
-router.delete('/queue/:id', removeQueue); // deletes a queue from the system
-router.get('/queue/:id/details', getQueueDetails); // gets the metadata associated with the queue
-router.get('/queue/:qid/length', getMessageCount); // get the count of messages in a queue
-router.get('/queue/:qid/message', getMessage); // get a message from the queue
-router.post('/queue/:qid/message', createMessage); // send a message to the queue
-router.delete('/queue/:qid/message/:id', removeMessage); // deletes a message from the system
+router.get('/queues', handlerHelpers.validateToken, listQueues); // get list of queues
+router.post('/queue', handlerHelpers.validateToken, createQueue); // create new queue
+router.post('/queue/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), updateQueue); // update a queue
+router.delete('/queue/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), removeQueue); // deletes a queue from the system
+router.get('/queue/:orid/details', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getQueueDetails); // gets the metadata associated with the queue
+router.get('/queue/:orid/length', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getMessageCount); // get the count of messages in a queue
+router.get('/message/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getMessage); // get a message from the queue
+router.post('/message/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), createMessage); // send a message to the queue
+router.delete('/message/:orid*', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(true, 'orid'), handlerHelpers.canAccessResource('orid'), removeMessage); // deletes a message from the system
 
 module.exports = router;
