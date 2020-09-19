@@ -1,4 +1,5 @@
 const bunyan = require('bunyan');
+
 const bunyanLogstashHttp = require('./bunyan-logstash-http');
 
 const buildLogStreams = () => {

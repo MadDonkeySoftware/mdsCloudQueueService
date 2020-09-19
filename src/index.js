@@ -3,7 +3,6 @@ const express = require('express');
 
 const globals = require('./globals');
 const handlersV1 = require('./handlers/v1');
-const handlersV2 = require('./handlers/v2');
 const appShutdown = require('./handlers/app_shutdown');
 
 const buildApp = () => {
@@ -27,7 +26,6 @@ const buildApp = () => {
     });
 
     expressApp.use('/v1/', handlersV1);
-    expressApp.use('/v2/', handlersV2);
   };
 
   app.use(requestLogger);
