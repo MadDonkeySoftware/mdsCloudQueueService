@@ -1,3 +1,4 @@
+const _ = require('lodash');
 const supertest = require('supertest');
 const sinon = require('sinon');
 const chai = require('chai');
@@ -29,31 +30,31 @@ const getStubbedRepo = () => ({
   releaseLock: sinon.stub(repos, 'releaseLock'),
 });
 
-
 describe('src/handlers/v1', () => {
   beforeEach(() => {
     sinon.stub(appShutdown, 'wire');
+    sinon.stub(handlerHelpers, 'getIssuer').returns('testIssuer');
     sinon.stub(handlerHelpers, 'getAppPublicSignature').resolves('public-signature');
     sinon.stub(jwt, 'verify')
       .withArgs('valid-jwt-system', 'public-signature')
       .returns({
         payload: {
           accountId: '1',
-          iss: 'mdsCloudQueueService',
+          iss: 'testIssuer',
         },
       })
       .withArgs('valid-jwt', 'public-signature')
       .returns({
         payload: {
           accountId: '1001',
-          iss: 'mdsCloudQueueService',
+          iss: 'testIssuer',
         },
       })
       .withArgs('valid-jwt-alt', 'public-signature')
       .returns({
         payload: {
           accountId: '1002',
-          iss: 'mdsCloudQueueService',
+          iss: 'testIssuer',
         },
       });
   });
@@ -63,7 +64,7 @@ describe('src/handlers/v1', () => {
   });
 
   const createExpectedOrid = (resourceId, resourceRider) => orid.v1.generate({
-    provider: process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService',
+    provider: `${process.env.ORID_PROVIDER_KEY || ''}`,
     service: 'qs',
     custom3: 1001,
     resourceId,
@@ -75,9 +76,9 @@ describe('src/handlers/v1', () => {
     const app = src.buildApp();
     const repoStubs = getStubbedRepo();
     repoStubs.listQueues.resolves([
-      `orid_1_${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}___1001_qs_one`,
-      `orid_1_${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}___1001_qs_two`,
-      `orid_1_${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}___1001_qs_three`,
+      `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_one`,
+      `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_two`,
+      `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_three`,
     ]);
 
     // Act / Assert
@@ -86,9 +87,9 @@ describe('src/handlers/v1', () => {
       .set('token', 'valid-jwt')
       .expect('content-type', /application\/json/)
       .expect(200, [
-        { name: 'one', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}:::1001:qs:one` },
-        { name: 'two', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}:::1001:qs:two` },
-        { name: 'three', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}:::1001:qs:three` },
+        { name: 'one', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:one` },
+        { name: 'two', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:two` },
+        { name: 'three', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:three` },
       ]);
   });
 
@@ -136,7 +137,7 @@ describe('src/handlers/v1', () => {
   });
 
   describe('creates queue', () => {
-    const buildQueueName = (name) => `orid_1_${process.env.ORID_PROVIDER_KEY || 'mdsCloudQueueService'}___1001_qs_${name}`;
+    const buildQueueName = (name) => `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_${name}`;
 
     it('when queue does not exist it creates a queue', () => {
       // Arrange
