@@ -1,4 +1,3 @@
-const _ = require('lodash');
 const supertest = require('supertest');
 const sinon = require('sinon');
 const chai = require('chai');
