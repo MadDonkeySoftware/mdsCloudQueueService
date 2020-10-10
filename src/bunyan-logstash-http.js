@@ -17,6 +17,8 @@ const nameFromLevel = {
 };
 
 const postMessage = function postMessage(settings, message) {
+  if (!message) return Promise.resolve();
+
   const data = JSON.stringify(message);
   const parsedUrl = url.parse(settings.loggingEndpoint);
   const options = {

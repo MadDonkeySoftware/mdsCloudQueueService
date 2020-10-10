@@ -183,7 +183,7 @@ const removeMessage = (request, response) => {
   const logger = globals.getLogger();
 
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
+  const escapedName = oridToRepoName(orid.v1.generate(_.omit(reqOrid, 'resourceRider')));
 
   return repos.removeMessage(escapedName, reqOrid.resourceRider)
     .then((count) => handlerHelpers.sendResponse(response, count ? 200 : 404))
@@ -192,14 +192,43 @@ const removeMessage = (request, response) => {
     });
 };
 
-router.get('/queues', handlerHelpers.validateToken, listQueues); // get list of queues
-router.post('/queue', handlerHelpers.validateToken, createQueue); // create new queue
-router.post('/queue/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), updateQueue); // update a queue
-router.delete('/queue/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), removeQueue); // deletes a queue from the system
-router.get('/queue/:orid/details', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getQueueDetails); // gets the metadata associated with the queue
-router.get('/queue/:orid/length', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getMessageCount); // get the count of messages in a queue
-router.get('/message/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), getMessage); // get a message from the queue
-router.post('/message/:orid', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(false, 'orid'), handlerHelpers.canAccessResource('orid'), createMessage); // send a message to the queue
-router.delete('/message/:orid*', handlerHelpers.validateToken, handlerHelpers.ensureRequestOrid(true, 'orid'), handlerHelpers.canAccessResource('orid'), removeMessage); // deletes a message from the system
+const logger = globals.getLogger();
+router.get('/queues', handlerHelpers.validateToken(logger), listQueues); // get list of queues
+router.post('/queue', handlerHelpers.validateToken(logger), createQueue); // create new queue
+router.post('/queue/:orid',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  updateQueue); // update a queue
+router.delete('/queue/:orid',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  removeQueue); // deletes a queue from the system
+router.get('/queue/:orid/details',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  getQueueDetails); // gets the metadata associated with the queue
+router.get('/queue/:orid/length',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  getMessageCount); // get the count of messages in a queue
+router.get('/message/:orid',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  getMessage); // get a message from the queue
+router.post('/message/:orid',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(false, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  createMessage); // send a message to the queue
+router.delete('/message/:orid*',
+  handlerHelpers.validateToken(logger),
+  handlerHelpers.ensureRequestOrid(true, 'orid'),
+  handlerHelpers.canAccessResource({ oridKey: 'orid', logger }),
+  removeMessage); // deletes a message from the system
 
 module.exports = router;
