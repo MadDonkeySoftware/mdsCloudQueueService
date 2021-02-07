@@ -54,7 +54,6 @@ describe('src/repos/redis', () => {
     });
   });
 
-
   describe('handleAppShutdown', () => {
     it('Calls quit on bundle objects containing quit', () => {
       // Arrange

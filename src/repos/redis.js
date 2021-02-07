@@ -73,7 +73,6 @@ const createQueue = (bundle, name, maxSize, delay, vt) => {
   });
 };
 
-
 /**
  * @param {RedisConnectionBundle} bundle The connection bundle to close
  * @param {string} name The name for the queue.
