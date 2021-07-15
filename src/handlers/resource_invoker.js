@@ -1,18 +1,24 @@
-const got = require('got');
+const mdsSdk = require('@maddonkeysoftware/mds-cloud-sdk-node');
+const orid = require('@maddonkeysoftware/orid-node');
 
 const globals = require('../globals');
 const repos = require('../repos');
+const helpers = require('../helpers');
 
-const invokeResourceFnProject = (url) => {
-  const body = '{}';
-  const opts = {
-    headers: {
-      'content-type': 'application/json',
-    },
-    body,
-  };
-
-  return got.post(url, opts);
+const invokeResourceForOrid = async (resource, payload) => {
+  const parsedOrid = orid.v1.parse(resource);
+  switch (parsedOrid.service) {
+    case 'sm': {
+      const client = mdsSdk.getStateMachineServiceClient();
+      return client.invokeStateMachine(resource, payload);
+    }
+    case 'sf': {
+      const client = mdsSdk.getServerlessFunctionsClient();
+      return client.invokeFunction(resource, payload);
+    }
+    default:
+      throw new Error(`Service type: "${parsedOrid.service}" not supported for invocation.`);
+  }
 };
 
 const invokeResourceUntilEmpty = async (qid) => {
@@ -67,7 +73,15 @@ const invokeResourceUntilEmpty = async (qid) => {
         { qid, metadata },
         'Invoking resource',
       );
-      await invokeResourceFnProject(meta.resource);
+      const payload = await repos.getMessage(qid);
+      try {
+        await invokeResourceForOrid(meta.resource, payload.message);
+      } catch (errInner) {
+        const dlqId = helpers.oridToRepoName(meta.dlq);
+        repos.createMessage(dlqId, payload.message);
+      } finally {
+        await repos.removeMessage(qid, payload.id);
+      }
       logger.trace(
         { qid, metadata },
         'Resource invoke completed successfully.',
@@ -91,6 +105,5 @@ const invokeResourceUntilEmpty = async (qid) => {
 };
 
 module.exports = {
-  invokeResourceFnProject,
   invokeResourceUntilEmpty,
 };

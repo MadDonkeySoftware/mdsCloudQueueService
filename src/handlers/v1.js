@@ -6,6 +6,7 @@ const repos = require('../repos');
 const globals = require('../globals');
 const handlerHelpers = require('./handler-helpers');
 const resourceInvoker = require('./resource_invoker');
+const helpers = require('../helpers');
 
 const router = express.Router();
 
@@ -19,19 +20,16 @@ const makeOrid = (name, accountId) => orid.v1.generate(_.merge({}, oridBase, {
   custom3: accountId,
 }));
 
-const oridToRepoName = (inOrid) => inOrid.replace(/:/g, '_');
-const repoNameToOrid = (inName) => inName.replace(/_/g, ':');
-
 const listQueues = (request, response) => {
   const accountId = _.get(request, ['parsedToken', 'payload', 'accountId']);
   return repos.listQueues()
     .then((results) => results.map((e) => {
-      const parsedOrid = orid.v1.parse(repoNameToOrid(e));
+      const parsedOrid = orid.v1.parse(helpers.repoNameToOrid(e));
       return parsedOrid.custom3 !== accountId
         ? undefined
         : ({
           name: parsedOrid.resourceId,
-          orid: repoNameToOrid(e),
+          orid: helpers.repoNameToOrid(e),
         });
     }))
     .then((results) => _.filter(results, (e) => !!e))
@@ -40,26 +38,67 @@ const listQueues = (request, response) => {
 
 const queueExists = (newName, queues) => queues.indexOf(newName) > -1;
 
+const validateResourceAndDlq = (resource, dlq) => {
+  if ((resource && !dlq) || (!resource && dlq)) {
+    return 'When using resource or dlq both resource and dlq must be provided.';
+  }
+
+  if (resource && !orid.v1.isValid(resource)) {
+    return 'It appears the resource is not a valid V1 ORID.';
+  }
+
+  if (dlq && !orid.v1.isValid(dlq)) {
+    return 'It appears the dlq is not a valid V1 ORID.';
+  }
+
+  if (resource && dlq) {
+    const resourceOrid = orid.v1.parse(resource);
+    const dlqOrid = orid.v1.parse(dlq);
+
+    const validResourceTypes = ['sf', 'sm'];
+    if (validResourceTypes.includes(resourceOrid.service) === false) {
+      return `Resource must be one of the following types: ${validResourceTypes.join(', ')}`;
+    }
+
+    if (dlqOrid.service !== 'qs') {
+      return 'DLQ does not appear to be a queue.';
+    }
+  }
+
+  // TODO: Ensure resource is either SM or SF
+  // TODO: Ensure that DQL is QS
+
+  // TODO: Ensure resource & DLQ belong to the requestor
+  return null;
+};
+
 const createQueue = (request, response) => {
   const logger = globals.getLogger();
   const {
-    resource, name, maxSize, delay, vt,
+    resource, dlq, name, maxSize, delay, vt,
   } = request.body;
   const queueMeta = JSON.stringify({
     resource,
+    dlq,
   });
   const accountId = _.get(request, ['parsedToken', 'payload', 'accountId']);
 
+  const errMessage = validateResourceAndDlq(resource, dlq);
+  if (errMessage) {
+    return handlerHelpers.sendResponse(response, 400, JSON.stringify({
+      message: errMessage,
+    }));
+  }
+
   const nameRegex = /^[a-zA-Z0-9-]*$/;
   if (!nameRegex.test(name) || name.length > 50) {
-    handlerHelpers.sendResponse(response, 400, JSON.stringify({
+    return handlerHelpers.sendResponse(response, 400, JSON.stringify({
       message: 'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
     }));
-    return Promise.resolve();
   }
 
   const newOrid = makeOrid(name, accountId);
-  const escapedName = oridToRepoName(newOrid);
+  const escapedName = helpers.oridToRepoName(newOrid);
 
   const newQueue = (newName, size, mdelay, visTimeout) => (
     repos.createQueue(newName, size, mdelay, visTimeout)
@@ -85,15 +124,22 @@ const createQueue = (request, response) => {
 
 const updateQueue = (request, response) => {
   const { body } = request;
-  const { resource } = body;
+  const { resource, dlq } = body;
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
+  const escapedName = helpers.oridToRepoName(orid.v1.generate(reqOrid));
+
+  const errMessage = validateResourceAndDlq(resource, dlq);
+  if (errMessage) {
+    return handlerHelpers.sendResponse(response, 400, JSON.stringify({
+      message: errMessage,
+    }));
+  }
 
   const mergeWithFilter = (a, b) => (b === undefined ? a : undefined);
   const metaKey = `queue-meta:${escapedName}`;
   return repos.getValueForKey(metaKey)
     .then((currentMeta) => JSON.parse(currentMeta))
-    .then((currentMeta) => _.mergeWith({}, currentMeta, { resource }, mergeWithFilter))
+    .then((currentMeta) => _.mergeWith({}, currentMeta, { resource, dlq }, mergeWithFilter))
     .then((newMeta) => _.pickBy(newMeta, _.identity))
     .then((newMeta) => repos.setValueForKey(metaKey, JSON.stringify(newMeta)))
     .then(() => handlerHelpers.sendResponse(response));
@@ -101,7 +147,7 @@ const updateQueue = (request, response) => {
 
 const removeQueue = (request, response) => {
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
+  const escapedName = helpers.oridToRepoName(orid.v1.generate(reqOrid));
 
   const deleteQueue = () => repos.removeQueue(escapedName)
     .then(() => repos.removeKey(`queue-meta:${escapedName}`));
@@ -115,7 +161,7 @@ const removeQueue = (request, response) => {
 const getQueueDetails = (request, response) => {
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
   const queueOrid = orid.v1.generate(reqOrid);
-  const escapedName = oridToRepoName(queueOrid);
+  const escapedName = helpers.oridToRepoName(queueOrid);
 
   return repos.getValueForKey(`queue-meta:${escapedName}`)
     .then((metadata) => metadata || '{}')
@@ -133,7 +179,7 @@ const getQueueDetails = (request, response) => {
 const getMessageCount = (request, response) => {
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
   const queueOrid = orid.v1.generate(reqOrid);
-  const escapedName = oridToRepoName(queueOrid);
+  const escapedName = helpers.oridToRepoName(queueOrid);
 
   return repos.getQueueSize(escapedName)
     .then((size) => handlerHelpers.sendResponse(response, 200, JSON.stringify({
@@ -147,7 +193,7 @@ const getMessage = (request, response) => {
   const logger = globals.getLogger();
 
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
+  const escapedName = helpers.oridToRepoName(orid.v1.generate(reqOrid));
 
   return repos.getMessage(escapedName)
     .then((message) => handlerHelpers.sendResponse(response, 200, message))
@@ -167,7 +213,7 @@ const createMessage = (request, response) => {
   const message = JSON.stringify(body);
 
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(reqOrid));
+  const escapedName = helpers.oridToRepoName(orid.v1.generate(reqOrid));
 
   // TODO: Research if resource defined skip queue and invoke directly is option
   // May want to also entertain batching messages before sending them to defined
@@ -183,7 +229,7 @@ const removeMessage = (request, response) => {
   const logger = globals.getLogger();
 
   const reqOrid = handlerHelpers.getOridFromRequest(request, 'orid');
-  const escapedName = oridToRepoName(orid.v1.generate(_.omit(reqOrid, 'resourceRider')));
+  const escapedName = helpers.oridToRepoName(orid.v1.generate(_.omit(reqOrid, 'resourceRider')));
 
   return repos.removeMessage(escapedName, reqOrid.resourceRider)
     .then((count) => handlerHelpers.sendResponse(response, count ? 200 : 404))

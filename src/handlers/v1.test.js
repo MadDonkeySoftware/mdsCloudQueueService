@@ -29,7 +29,7 @@ const getStubbedRepo = () => ({
   releaseLock: sinon.stub(repos, 'releaseLock'),
 });
 
-describe('src/handlers/v1', () => {
+describe(__filename, () => {
   beforeEach(() => {
     sinon.stub(appShutdown, 'wire');
     sinon.stub(handlerHelpers, 'getIssuer').returns('testIssuer');
@@ -138,7 +138,7 @@ describe('src/handlers/v1', () => {
   describe('creates queue', () => {
     const buildQueueName = (name) => `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_${name}`;
 
-    it('when queue does not exist it creates a queue', () => {
+    it('when queue does not exist it creates a queue with resource and DLQ', () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
@@ -149,7 +149,7 @@ describe('src/handlers/v1', () => {
       return supertest(app)
         .post('/v1/queue')
         .set('token', 'valid-jwt')
-        .send({ name: 'test', resource: 'http://127.0.0.1/abc/invoke' })
+        .send({ name: 'test', resource: 'orid:1::::1001:sm:test', dlq: createExpectedOrid('test-dlq') })
         .expect(201, {
           name: 'test',
           orid: createExpectedOrid('test'),
@@ -162,8 +162,76 @@ describe('src/handlers/v1', () => {
           chai.expect(repoStubs.createQueue.firstCall.args[3]).to.equal();
           chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal(`queue-meta:${buildQueueName('test')}`);
           chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
-            resource: 'http://127.0.0.1/abc/invoke',
+            resource: 'orid:1::::1001:sm:test',
+            dlq: createExpectedOrid('test-dlq'),
           }));
+        });
+    });
+
+    it('when queue does not exist it creates a queue without resource and DLQ', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v1/queue')
+        .set('token', 'valid-jwt')
+        .send({ name: 'test' })
+        .expect(201, {
+          name: 'test',
+          orid: createExpectedOrid('test'),
+        })
+        .then(() => {
+          chai.expect(repoStubs.createQueue.callCount).to.equal(1);
+          chai.expect(repoStubs.createQueue.firstCall.args[0]).to.equal(buildQueueName('test'));
+          chai.expect(repoStubs.createQueue.firstCall.args[1]).to.equal();
+          chai.expect(repoStubs.createQueue.firstCall.args[2]).to.equal();
+          chai.expect(repoStubs.createQueue.firstCall.args[3]).to.equal();
+          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal(`queue-meta:${buildQueueName('test')}`);
+          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({}));
+        });
+    });
+
+    it('when queue does not exist it and resource is invalid does not creates a queue', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v1/queue')
+        .set('token', 'valid-jwt')
+        .send({ name: 'test', resource: 'http://foo/bar/baz', dlq: createExpectedOrid('test-dlq') })
+        .expect(400, {
+          message: 'It appears the resource is not a valid V1 ORID.',
+        })
+        .then(() => {
+          chai.expect(repoStubs.createQueue.callCount).to.equal(0);
+        });
+    });
+
+    it('when queue does not exist it and dlq is invalid does not creates a queue', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v1/queue')
+        .set('token', 'valid-jwt')
+        .send({ name: 'test', resource: createExpectedOrid('test'), dlq: 'asdf' })
+        .expect(400, {
+          message: 'It appears the dlq is not a valid V1 ORID.',
+        })
+        .then(() => {
+          chai.expect(repoStubs.createQueue.callCount).to.equal(0);
         });
     });
 
@@ -201,10 +269,50 @@ describe('src/handlers/v1', () => {
           message: 'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
         });
     });
+
+    it('when queue does not exist it and resource provided but dlq not provided does not creates a queue', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v1/queue')
+        .set('token', 'valid-jwt')
+        .send({ name: 'test', resource: 'http://foo/bar/baz' })
+        .expect(400, {
+          message: 'When using resource or dlq both resource and dlq must be provided.',
+        })
+        .then(() => {
+          chai.expect(repoStubs.createQueue.callCount).to.equal(0);
+        });
+    });
+
+    it('when queue does not exist it and dlq provided but resource not provided does not creates a queue', () => {
+      // Arrange
+      const app = src.buildApp();
+      const repoStubs = getStubbedRepo();
+      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.createQueue.resolves(1);
+
+      // Act / Assert
+      return supertest(app)
+        .post('/v1/queue')
+        .set('token', 'valid-jwt')
+        .send({ name: 'test', dlq: createExpectedOrid('test-dlq') })
+        .expect(400, {
+          message: 'When using resource or dlq both resource and dlq must be provided.',
+        })
+        .then(() => {
+          chai.expect(repoStubs.createQueue.callCount).to.equal(0);
+        });
+    });
   });
 
   describe('update queue', () => {
-    it('updates the queue metadata', () => {
+    it('updates the queue metadata when resource and dlq provided', () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
@@ -214,13 +322,14 @@ describe('src/handlers/v1', () => {
       return supertest(app)
         .post('/v1/queue/orid:1:mdsCloud:::1001:qs:test')
         .set('token', 'valid-jwt')
-        .send({ resource: 'http://127.0.0.1/abc/invoke' })
+        .send({ resource: 'orid:1:mdsCloud:::1001:sf:test', dlq: createExpectedOrid('test-dlq') })
         .expect(200)
         .then(() => {
           chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
           chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
             other: 'value',
-            resource: 'http://127.0.0.1/abc/invoke',
+            resource: 'orid:1:mdsCloud:::1001:sf:test',
+            dlq: createExpectedOrid('test-dlq'),
           }));
         });
     });
@@ -338,7 +447,7 @@ describe('src/handlers/v1', () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.listQueues.resolves(['test', 'test2']);
-      repoStubs.getValueForKey.resolves('{"resource":"resource"}');
+      repoStubs.getValueForKey.resolves('{"resource":"resource","dlq":"dlq"}');
 
       // Act / Assert
       return supertest(app)
@@ -347,6 +456,7 @@ describe('src/handlers/v1', () => {
         .expect(200, {
           orid: 'orid:1:mdsCloud:::1001:qs:test',
           resource: 'resource',
+          dlq: 'dlq',
         });
     });
 
