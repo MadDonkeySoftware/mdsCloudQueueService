@@ -1,7 +1,7 @@
 const sinon = require('sinon');
 const chai = require('chai');
+const mdsSdk = require('@maddonkeysoftware/mds-cloud-sdk-node');
 
-const got = require('got');
 const repos = require('../repos');
 const globals = require('../globals');
 const { testWithSafeEnv } = require('../test-utilities');
@@ -24,7 +24,7 @@ const getStubbedRepo = () => ({
   releaseLock: sinon.stub(repos, 'releaseLock'),
 });
 
-describe('src/handlers/resource_invoker', () => {
+describe(__filename, () => {
   beforeEach(() => {
     sinon.stub(globals, 'getLogger').returns({
       trace: sinon.stub(),
@@ -39,43 +39,52 @@ describe('src/handlers/resource_invoker', () => {
   describe('invokeResourceUntilEmpty', () => {
     it('does nothing when queue has no metadata', () => {
       // Arrange
-      const postStub = sinon.stub(got, 'post');
       const repoStub = getStubbedRepo();
       repoStub.isLocked.resolves(false);
       repoStub.getValueForKey.resolves('');
+      const sfClient = {
+        invokeFunction: sinon.stub().resolves(),
+      };
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
         // Assert
-        chai.expect(postStub.callCount).to.equal(0);
+        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
       });
     });
 
     it('does nothing when queue has empty metadata', () => {
       // Arrange
-      const postStub = sinon.stub(got, 'post');
       const repoStub = getStubbedRepo();
       repoStub.isLocked.resolves(false);
       repoStub.getValueForKey.resolves('{}');
+      const sfClient = {
+        invokeFunction: sinon.stub().resolves(),
+      };
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
         // Assert
-        chai.expect(postStub.callCount).to.equal(0);
+        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
       });
     });
 
     it('does nothing when queue has empty metadata resource', () => {
       // Arrange
-      const postStub = sinon.stub(got, 'post');
       const repoStub = getStubbedRepo();
       repoStub.isLocked.resolves(false);
       repoStub.getValueForKey.resolves('{ "something": "else" }');
+      const sfClient = {
+        invokeFunction: sinon.stub().resolves(),
+      };
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
         // Assert
-        chai.expect(postStub.callCount).to.equal(0);
+        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
       });
     });
 
@@ -83,48 +92,108 @@ describe('src/handlers/resource_invoker', () => {
       DISABLE_FIRE_EVENTS: 'true',
     }, () => {
       // Arrange
-      const postStub = sinon.stub(got, 'post');
       const repoStub = getStubbedRepo();
       repoStub.isLocked.resolves(false);
       repoStub.getValueForKey.resolves('{ "something": "else" }');
+      const sfClient = {
+        invokeFunction: sinon.stub().resolves(),
+      };
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
         // Assert
-        chai.expect(postStub.callCount).to.equal(0);
+        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
       });
     }));
 
     it('does nothing when queue is locked', () => {
       // Arrange
-      const postStub = sinon.stub(got, 'post');
       const repoStub = getStubbedRepo();
       repoStub.isLocked.resolves(true);
+      const sfClient = {
+        invokeFunction: sinon.stub().resolves(),
+      };
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
         // Assert
-        chai.expect(postStub.callCount).to.equal(0);
+        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
       });
     });
 
     describe('metadata has resource', () => {
-      it('invokes once when one message available', () => {
+      it('functions resource invokes twice when two messages available', () => {
         // Arrange
-        const postStub = sinon.stub(got, 'post');
-        postStub.resolves();
-
         const repoStub = getStubbedRepo();
         repoStub.isLocked.resolves(false);
-        repoStub.getValueForKey.resolves('{ "resource": "http://127.0.0.1/invoke/123" }');
+        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555"}');
         repoStub.getQueueSize.onCall(0).resolves(2);
         repoStub.getQueueSize.onCall(1).resolves(1);
         repoStub.getQueueSize.onCall(2).resolves(0);
+        repoStub.getMessage.onCall(0).resolves({ id: '1', message: '{}' });
+        repoStub.getMessage.onCall(1).resolves({ id: '2', message: '{}' });
+        const sfClient = {
+          invokeFunction: sinon.stub().resolves(),
+        };
+        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
 
         // Act
         return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
           // Assert
-          chai.expect(postStub.callCount).to.equal(2);
+          chai.expect(sfClient.invokeFunction.callCount).to.equal(2);
+          chai.expect(repoStub.removeMessage.callCount).to.equal(2);
+        });
+      });
+
+      it('state machine resource invokes twice when two messages available', () => {
+        // Arrange
+        const repoStub = getStubbedRepo();
+        repoStub.isLocked.resolves(false);
+        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sm:11111111-2222-3333-4444-555555555555"}');
+        repoStub.getQueueSize.onCall(0).resolves(2);
+        repoStub.getQueueSize.onCall(1).resolves(1);
+        repoStub.getQueueSize.onCall(2).resolves(0);
+        repoStub.getMessage.onCall(0).resolves({ id: '1', message: '{}' });
+        repoStub.getMessage.onCall(1).resolves({ id: '2', message: '{}' });
+        const smClient = {
+          invokeStateMachine: sinon.stub().resolves(),
+        };
+        sinon.stub(mdsSdk, 'getStateMachineServiceClient').returns(smClient);
+
+        // Act
+        return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
+          // Assert
+          chai.expect(smClient.invokeStateMachine.callCount).to.equal(2);
+          chai.expect(repoStub.removeMessage.callCount).to.equal(2);
+        });
+      });
+
+      it('moves message to DLQ when resource invoke fails', () => {
+        // Arrange
+        const repoStub = getStubbedRepo();
+        repoStub.isLocked.resolves(false);
+        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555", "dlq":"orid:1:mdscloud:::1001:qs:test-dlq"}');
+        repoStub.getQueueSize.onCall(0).resolves(1);
+        repoStub.getQueueSize.onCall(1).resolves(0);
+        repoStub.getMessage.onCall(0).resolves({ id: '1', message: '{}' });
+        repoStub.createMessage.resolves();
+        const sfClient = {
+          invokeFunction: sinon.stub().rejects(),
+        };
+        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+
+        // Act
+        return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
+          // Assert
+          chai.expect(sfClient.invokeFunction.callCount).to.equal(1);
+          chai.expect(repoStub.removeMessage.callCount).to.equal(1);
+          chai.expect(repoStub.createMessage.callCount).to.equal(1);
+          chai.expect(repoStub.createMessage.getCall(0).args).to.deep.equal([
+            'orid_1_mdscloud___1001_qs_test-dlq',
+            '{}',
+          ]);
         });
       });
     });
