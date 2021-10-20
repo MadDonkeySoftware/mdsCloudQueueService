@@ -9,11 +9,11 @@ const invokeResourceForOrid = async (resource, payload) => {
   const parsedOrid = orid.v1.parse(resource);
   switch (parsedOrid.service) {
     case 'sm': {
-      const client = mdsSdk.getStateMachineServiceClient();
+      const client = await mdsSdk.getStateMachineServiceClient();
       return client.invokeStateMachine(resource, payload);
     }
     case 'sf': {
-      const client = mdsSdk.getServerlessFunctionsClient();
+      const client = await mdsSdk.getServerlessFunctionsClient();
       return client.invokeFunction(resource, payload);
     }
     default:
