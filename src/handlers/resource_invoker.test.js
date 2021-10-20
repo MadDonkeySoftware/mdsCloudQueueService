@@ -45,7 +45,7 @@ describe(__filename, () => {
       const sfClient = {
         invokeFunction: sinon.stub().resolves(),
       };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -62,7 +62,7 @@ describe(__filename, () => {
       const sfClient = {
         invokeFunction: sinon.stub().resolves(),
       };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -79,7 +79,7 @@ describe(__filename, () => {
       const sfClient = {
         invokeFunction: sinon.stub().resolves(),
       };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -98,7 +98,7 @@ describe(__filename, () => {
       const sfClient = {
         invokeFunction: sinon.stub().resolves(),
       };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -114,7 +114,7 @@ describe(__filename, () => {
       const sfClient = {
         invokeFunction: sinon.stub().resolves(),
       };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
       // Act
       return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -137,7 +137,7 @@ describe(__filename, () => {
         const sfClient = {
           invokeFunction: sinon.stub().resolves(),
         };
-        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
         // Act
         return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -160,7 +160,7 @@ describe(__filename, () => {
         const smClient = {
           invokeStateMachine: sinon.stub().resolves(),
         };
-        sinon.stub(mdsSdk, 'getStateMachineServiceClient').returns(smClient);
+        sinon.stub(mdsSdk, 'getStateMachineServiceClient').resolves(smClient);
 
         // Act
         return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
@@ -182,7 +182,7 @@ describe(__filename, () => {
         const sfClient = {
           invokeFunction: sinon.stub().rejects(),
         };
-        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').returns(sfClient);
+        sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
         // Act
         return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {

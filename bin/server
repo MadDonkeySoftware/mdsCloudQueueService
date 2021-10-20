@@ -4,17 +4,21 @@ const mdsSdk = require('@maddonkeysoftware/mds-cloud-sdk-node');
 const src = require('../src');
 const globals = require('../src/globals');
 
-mdsSdk.initialize({
-  identityUrl: process.env.MDS_IDENTITY_URL,
-  account: process.env.MDS_QS_SYS_ACCOUNT,
-  userId: process.env.MDS_QS_SYS_USER,
-  password: process.env.MDS_QS_SYS_PASSWORD,
-  sfUrl: process.env.MDS_QS_SF_URL,
-  smUrl: process.env.MDS_QS_SM_URL,
-});
+const init = async () => {
+  await mdsSdk.initialize({
+    identityUrl: process.env.MDS_IDENTITY_URL,
+    account: process.env.MDS_QS_SYS_ACCOUNT,
+    userId: process.env.MDS_QS_SYS_USER,
+    password: process.env.MDS_QS_SYS_PASSWORD,
+    sfUrl: process.env.MDS_QS_SF_URL,
+    smUrl: process.env.MDS_QS_SM_URL,
+  });
 
-const logger = globals.getLogger();
-const port = process.env.API_PORT || 8888;
-const app = src.buildApp();
+  const logger = globals.getLogger();
+  const port = process.env.API_PORT || 8888;
+  const app = src.buildApp();
 
-app.listen(port, () => logger.info(`Example app listening on port ${port}!`));
+  app.listen(port, () => logger.info(`Example app listening on port ${port}!`));
+};
+
+init();
