@@ -88,24 +88,28 @@ describe(__filename, () => {
       });
     });
 
-    it('does nothing when event firing is disabled', () => testWithSafeEnv({
-      DISABLE_FIRE_EVENTS: 'true',
-    }, () => {
-      // Arrange
-      const repoStub = getStubbedRepo();
-      repoStub.isLocked.resolves(false);
-      repoStub.getValueForKey.resolves('{ "something": "else" }');
-      const sfClient = {
-        invokeFunction: sinon.stub().resolves(),
-      };
-      sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
+    it('does nothing when event firing is disabled', () =>
+      testWithSafeEnv(
+        {
+          DISABLE_FIRE_EVENTS: 'true',
+        },
+        () => {
+          // Arrange
+          const repoStub = getStubbedRepo();
+          repoStub.isLocked.resolves(false);
+          repoStub.getValueForKey.resolves('{ "something": "else" }');
+          const sfClient = {
+            invokeFunction: sinon.stub().resolves(),
+          };
+          sinon.stub(mdsSdk, 'getServerlessFunctionsClient').resolves(sfClient);
 
-      // Act
-      return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
-        // Assert
-        chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
-      });
-    }));
+          // Act
+          return resourceInvoker.invokeResourceUntilEmpty('test').then(() => {
+            // Assert
+            chai.expect(sfClient.invokeFunction.callCount).to.equal(0);
+          });
+        },
+      ));
 
     it('does nothing when queue is locked', () => {
       // Arrange
@@ -128,7 +132,9 @@ describe(__filename, () => {
         // Arrange
         const repoStub = getStubbedRepo();
         repoStub.isLocked.resolves(false);
-        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555"}');
+        repoStub.getValueForKey.resolves(
+          '{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555"}',
+        );
         repoStub.getQueueSize.onCall(0).resolves(2);
         repoStub.getQueueSize.onCall(1).resolves(1);
         repoStub.getQueueSize.onCall(2).resolves(0);
@@ -151,7 +157,9 @@ describe(__filename, () => {
         // Arrange
         const repoStub = getStubbedRepo();
         repoStub.isLocked.resolves(false);
-        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sm:11111111-2222-3333-4444-555555555555"}');
+        repoStub.getValueForKey.resolves(
+          '{"resource":"orid:1:mdsCloud:::1001:sm:11111111-2222-3333-4444-555555555555"}',
+        );
         repoStub.getQueueSize.onCall(0).resolves(2);
         repoStub.getQueueSize.onCall(1).resolves(1);
         repoStub.getQueueSize.onCall(2).resolves(0);
@@ -174,7 +182,9 @@ describe(__filename, () => {
         // Arrange
         const repoStub = getStubbedRepo();
         repoStub.isLocked.resolves(false);
-        repoStub.getValueForKey.resolves('{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555", "dlq":"orid:1:mdscloud:::1001:qs:test-dlq"}');
+        repoStub.getValueForKey.resolves(
+          '{"resource":"orid:1:mdsCloud:::1001:sf:11111111-2222-3333-4444-555555555555", "dlq":"orid:1:mdscloud:::1001:qs:test-dlq"}',
+        );
         repoStub.getQueueSize.onCall(0).resolves(1);
         repoStub.getQueueSize.onCall(1).resolves(0);
         repoStub.getMessage.onCall(0).resolves({ id: '1', message: '{}' });
@@ -190,10 +200,9 @@ describe(__filename, () => {
           chai.expect(sfClient.invokeFunction.callCount).to.equal(1);
           chai.expect(repoStub.removeMessage.callCount).to.equal(1);
           chai.expect(repoStub.createMessage.callCount).to.equal(1);
-          chai.expect(repoStub.createMessage.getCall(0).args).to.deep.equal([
-            'orid_1_mdscloud___1001_qs_test-dlq',
-            '{}',
-          ]);
+          chai
+            .expect(repoStub.createMessage.getCall(0).args)
+            .to.deep.equal(['orid_1_mdscloud___1001_qs_test-dlq', '{}']);
         });
       });
     });

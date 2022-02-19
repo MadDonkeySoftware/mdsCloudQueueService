@@ -41,42 +41,54 @@ describe('src/repos/index', () => {
     verifyModuleMethodsExist(localModule);
   });
 
-  it('when db url set to redis initializes redis', () => testWithSafeEnv({
-    MDS_QS_DB_URL: 'redis://127.0.0.1',
-  }, () => {
-    // Arrange
-    const createConnectionBundleStub = sinon.stub();
-
-    // Act
-    const localModule = proxyquire('.', {
-      './redis': {
-        createConnectionBundle: createConnectionBundleStub,
+  it('when db url set to redis initializes redis', () =>
+    testWithSafeEnv(
+      {
+        MDS_QS_DB_URL: 'redis://127.0.0.1',
       },
-    });
+      () => {
+        // Arrange
+        const createConnectionBundleStub = sinon.stub();
 
-    // Assert
-    chai.expect(createConnectionBundleStub.callCount).to.equal(1);
-    verifyModuleMethodsExist(localModule);
-  }));
+        // Act
+        const localModule = proxyquire('.', {
+          './redis': {
+            createConnectionBundle: createConnectionBundleStub,
+          },
+        });
 
-  it('when db url set to redis initializes redis', () => testWithSafeEnv({
-    MDS_QS_DB_URL: 'mysql://127.0.0.1',
-  }, () => {
-    // Arrange
-    const createConnectionBundleStub = sinon.stub();
+        // Assert
+        chai.expect(createConnectionBundleStub.callCount).to.equal(1);
+        verifyModuleMethodsExist(localModule);
+      },
+    ));
 
-    // Act
-    try {
-      proxyquire('.', {
-        './redis': {
-          createConnectionBundle: createConnectionBundleStub,
-        },
-      });
-    } catch (err) {
-      chai.expect(err.message).to.be.equal('Database not configured properly. "mysql://127.0.0.1" not understood.');
-    }
+  it('when db url set to redis initializes redis', () =>
+    testWithSafeEnv(
+      {
+        MDS_QS_DB_URL: 'mysql://127.0.0.1',
+      },
+      () => {
+        // Arrange
+        const createConnectionBundleStub = sinon.stub();
 
-    // Assert
-    chai.expect(createConnectionBundleStub.callCount).to.equal(0);
-  }));
+        // Act
+        try {
+          proxyquire('.', {
+            './redis': {
+              createConnectionBundle: createConnectionBundleStub,
+            },
+          });
+        } catch (err) {
+          chai
+            .expect(err.message)
+            .to.be.equal(
+              'Database not configured properly. "mysql://127.0.0.1" not understood.',
+            );
+        }
+
+        // Assert
+        chai.expect(createConnectionBundleStub.callCount).to.equal(0);
+      },
+    ));
 });

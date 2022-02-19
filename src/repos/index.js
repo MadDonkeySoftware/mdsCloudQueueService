@@ -41,11 +41,16 @@ const initializeRedis = () => {
 };
 
 const initializeStorage = () => {
-  if (!process.env.MDS_QS_DB_URL || process.env.MDS_QS_DB_URL.startsWith('redis://')) {
+  if (
+    !process.env.MDS_QS_DB_URL ||
+    process.env.MDS_QS_DB_URL.startsWith('redis://')
+  ) {
     return initializeRedis();
   }
 
-  throw new Error(`Database not configured properly. "${process.env.MDS_QS_DB_URL}" not understood.`);
+  throw new Error(
+    `Database not configured properly. "${process.env.MDS_QS_DB_URL}" not understood.`,
+  );
 };
 
 module.exports = initializeStorage();

@@ -9,7 +9,9 @@ const redisModule = require('./redis');
 const successfulCallback = (expectedData) => {
   const impl = (...args) => {
     const cb = args[args.length - 1];
-    Promise.resolve().then(() => { cb(undefined, expectedData); });
+    Promise.resolve().then(() => {
+      cb(undefined, expectedData);
+    });
   };
   return impl;
 };
@@ -17,7 +19,9 @@ const successfulCallback = (expectedData) => {
 const failedCallback = (expectedData) => {
   const impl = (...args) => {
     const cb = args[args.length - 1];
-    Promise.resolve().then(() => { cb(expectedData, undefined); });
+    Promise.resolve().then(() => {
+      cb(expectedData, undefined);
+    });
   };
   return impl;
 };
@@ -77,11 +81,7 @@ describe('src/repos/redis', () => {
   describe('listQueues', () => {
     it('returns available queues', () => {
       // Arrange
-      const expectedData = [
-        'test1',
-        'test2',
-        'test3',
-      ];
+      const expectedData = ['test1', 'test2', 'test3'];
       const bundle = {
         redisSMQ: {
           listQueues: sinon.fake(successfulCallback(expectedData)),
@@ -108,18 +108,20 @@ describe('src/repos/redis', () => {
       };
 
       // Act
-      return redisModule.createQueue(bundle, 'testQueue', 1024, 0, 0).then((result) => {
-        // Assert
-        chai.expect(result).to.deep.equal(expectedData);
-        const calls = bundle.redisSMQ.createQueue.getCalls();
-        chai.expect(calls.length).to.equal(1);
-        chai.expect(calls[0].args[0]).to.deep.equal({
-          delay: 0,
-          maxsize: 1024,
-          qname: 'testQueue',
-          vt: 0,
+      return redisModule
+        .createQueue(bundle, 'testQueue', 1024, 0, 0)
+        .then((result) => {
+          // Assert
+          chai.expect(result).to.deep.equal(expectedData);
+          const calls = bundle.redisSMQ.createQueue.getCalls();
+          chai.expect(calls.length).to.equal(1);
+          chai.expect(calls[0].args[0]).to.deep.equal({
+            delay: 0,
+            maxsize: 1024,
+            qname: 'testQueue',
+            vt: 0,
+          });
         });
-      });
     });
   });
 
@@ -180,16 +182,18 @@ describe('src/repos/redis', () => {
       };
 
       // Act
-      return redisModule.createMessage(bundle, 'testQueue', 'testMessage').then((result) => {
-        chai.expect(result).to.deep.equal(expectedData);
-        const calls = bundle.redisSMQ.sendMessage.getCalls();
-        chai.expect(calls.length).to.equal(1);
-        chai.expect(calls[0].args[0]).to.deep.equal({
-          qname: 'testQueue',
-          message: 'testMessage',
-          delay: undefined,
+      return redisModule
+        .createMessage(bundle, 'testQueue', 'testMessage')
+        .then((result) => {
+          chai.expect(result).to.deep.equal(expectedData);
+          const calls = bundle.redisSMQ.sendMessage.getCalls();
+          chai.expect(calls.length).to.equal(1);
+          chai.expect(calls[0].args[0]).to.deep.equal({
+            qname: 'testQueue',
+            message: 'testMessage',
+            delay: undefined,
+          });
         });
-      });
     });
   });
 
@@ -204,15 +208,17 @@ describe('src/repos/redis', () => {
       };
 
       // Act
-      return redisModule.removeMessage(bundle, 'testQueue', '123').then((result) => {
-        chai.expect(result).to.deep.equal(expectedData);
-        const calls = bundle.redisSMQ.deleteMessage.getCalls();
-        chai.expect(calls.length).to.equal(1);
-        chai.expect(calls[0].args[0]).to.deep.equal({
-          qname: 'testQueue',
-          id: '123',
+      return redisModule
+        .removeMessage(bundle, 'testQueue', '123')
+        .then((result) => {
+          chai.expect(result).to.deep.equal(expectedData);
+          const calls = bundle.redisSMQ.deleteMessage.getCalls();
+          chai.expect(calls.length).to.equal(1);
+          chai.expect(calls[0].args[0]).to.deep.equal({
+            qname: 'testQueue',
+            id: '123',
+          });
         });
-      });
     });
   });
 
@@ -222,7 +228,9 @@ describe('src/repos/redis', () => {
       const expectedData = 3;
       const bundle = {
         redisSMQ: {
-          getQueueAttributes: sinon.fake(successfulCallback({ msgs: expectedData })),
+          getQueueAttributes: sinon.fake(
+            successfulCallback({ msgs: expectedData }),
+          ),
         },
       };
 
@@ -249,13 +257,15 @@ describe('src/repos/redis', () => {
       };
 
       // Act
-      return redisModule.setValueForKey(bundle, 'testQueue', 'test').then((result) => {
-        chai.expect(result).to.deep.equal(expectedData);
-        const calls = bundle.redisClient.set.getCalls();
-        chai.expect(calls.length).to.equal(1);
-        chai.expect(calls[0].args[0]).to.deep.equal('testQueue');
-        chai.expect(calls[0].args[1]).to.deep.equal('test');
-      });
+      return redisModule
+        .setValueForKey(bundle, 'testQueue', 'test')
+        .then((result) => {
+          chai.expect(result).to.deep.equal(expectedData);
+          const calls = bundle.redisClient.set.getCalls();
+          chai.expect(calls.length).to.equal(1);
+          chai.expect(calls[0].args[0]).to.deep.equal('testQueue');
+          chai.expect(calls[0].args[1]).to.deep.equal('test');
+        });
     });
   });
 
@@ -316,7 +326,9 @@ describe('src/repos/redis', () => {
         chai.expect(calls.length).to.equal(1);
         chai.expect(calls[0].args[0]).to.deep.equal('testLock');
         chai.expect(calls[0].args[1]).to.deep.equal(12);
-        chai.expect(calls[0].args[2]).to.deep.equal(`owned-by-${os.hostname()}`);
+        chai
+          .expect(calls[0].args[2])
+          .to.deep.equal(`owned-by-${os.hostname()}`);
       });
     });
 
@@ -336,7 +348,9 @@ describe('src/repos/redis', () => {
         chai.expect(calls.length).to.equal(1);
         chai.expect(calls[0].args[0]).to.deep.equal('testLock');
         chai.expect(calls[0].args[1]).to.deep.equal(12);
-        chai.expect(calls[0].args[2]).to.deep.equal(`owned-by-${os.hostname()}`);
+        chai
+          .expect(calls[0].args[2])
+          .to.deep.equal(`owned-by-${os.hostname()}`);
       });
     });
   });

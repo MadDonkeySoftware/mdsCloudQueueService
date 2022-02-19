@@ -18,7 +18,9 @@ const parseRedisUrl = require('parse-redis-url')(redis);
 const createConnectionBundle = (redisUrl) => {
   if (process.env.NODE_ENV === 'test') return undefined;
 
-  const { host, port } = parseRedisUrl.parse(redisUrl || 'redis://127.0.0.1:6379');
+  const { host, port } = parseRedisUrl.parse(
+    redisUrl || 'redis://127.0.0.1:6379',
+  );
 
   const redisClient = redis.createClient({ host, port });
   const redisSMQ = new RedisSMQ({ host, port, ns: 'rsmq' });
@@ -36,15 +38,18 @@ const createConnectionBundle = (redisUrl) => {
  * @param {RedisConnectionBundle} bundle The connection bundle to close
  * @returns {Promise<void>}
  */
-const handleAppShutdown = (bundle) => new Promise((resolve) => {
-  const keys = Object.keys(bundle);
-  for (let i = 0; i < keys.length; i += 1) {
-    const item = bundle[keys[i]];
-    if (item.quit) { item.quit(); }
-  }
+const handleAppShutdown = (bundle) =>
+  new Promise((resolve) => {
+    const keys = Object.keys(bundle);
+    for (let i = 0; i < keys.length; i += 1) {
+      const item = bundle[keys[i]];
+      if (item.quit) {
+        item.quit();
+      }
+    }
 
-  resolve();
-});
+    resolve();
+  });
 
 /**
  * Gets an array of the available queues.
@@ -129,9 +134,10 @@ const removeMessage = (bundle, name, id) => {
  * @returns {Promise<number>}
  */
 const getQueueSize = (bundle, name) => {
-  const getQueueAttributesPromise = util.promisify(bundle.redisSMQ.getQueueAttributes);
-  return getQueueAttributesPromise({ qname: name })
-    .then((resp) => resp.msgs);
+  const getQueueAttributesPromise = util.promisify(
+    bundle.redisSMQ.getQueueAttributes,
+  );
+  return getQueueAttributesPromise({ qname: name }).then((resp) => resp.msgs);
 };
 
 /**
@@ -140,7 +146,9 @@ const getQueueSize = (bundle, name) => {
  * @param {string} value The value to be stored.
  */
 const setValueForKey = (bundle, key, value) => {
-  const setPromise = util.promisify(bundle.redisClient.set).bind(bundle.redisClient);
+  const setPromise = util
+    .promisify(bundle.redisClient.set)
+    .bind(bundle.redisClient);
   return setPromise(key, value);
 };
 
@@ -149,7 +157,9 @@ const setValueForKey = (bundle, key, value) => {
  * @param {string} key The unique identifier for the value
  */
 const getValueForKey = (bundle, key) => {
-  const getPromise = util.promisify(bundle.redisClient.get).bind(bundle.redisClient);
+  const getPromise = util
+    .promisify(bundle.redisClient.get)
+    .bind(bundle.redisClient);
   return getPromise(key);
 };
 
@@ -158,7 +168,9 @@ const getValueForKey = (bundle, key) => {
  * @param {string} key The unique identifier for the value
  */
 const removeKey = (bundle, key) => {
-  const delPromise = util.promisify(bundle.redisClient.del).bind(bundle.redisClient);
+  const delPromise = util
+    .promisify(bundle.redisClient.del)
+    .bind(bundle.redisClient);
   return delPromise(key);
 };
 
@@ -169,16 +181,19 @@ const lockValue = `owned-by-${os.hostname()}`;
  * @returns {Promise<boolean>}
  */
 const acquireLock = (bundle, lockName, timeout) => {
-  const acquireLockPromise = util.promisify(bundle.redisLock.acquire).bind(bundle.redisLock);
-  return acquireLockPromise(lockName, timeout, lockValue)
-    .catch(() => false);
+  const acquireLockPromise = util
+    .promisify(bundle.redisLock.acquire)
+    .bind(bundle.redisLock);
+  return acquireLockPromise(lockName, timeout, lockValue).catch(() => false);
 };
 
 /**
  * @param {RedisConnectionBundle} bundle The connection bundle to close
  */
 const isLocked = (bundle, lockName) => {
-  const isLockedPromise = util.promisify(bundle.redisLock.isLocked).bind(bundle.redisLock);
+  const isLockedPromise = util
+    .promisify(bundle.redisLock.isLocked)
+    .bind(bundle.redisLock);
   return isLockedPromise(lockName).then((r) => !!r);
 };
 
@@ -186,7 +201,9 @@ const isLocked = (bundle, lockName) => {
  * @param {RedisConnectionBundle} bundle The connection bundle to close
  */
 const releaseLock = (bundle, lockName) => {
-  const releaseLockPromise = util.promisify(bundle.redisLock.release).bind(bundle.redisLock);
+  const releaseLockPromise = util
+    .promisify(bundle.redisLock.release)
+    .bind(bundle.redisLock);
   return releaseLockPromise(lockName, lockValue).catch(() => false);
 };
 

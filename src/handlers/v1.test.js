@@ -33,8 +33,11 @@ describe(__filename, () => {
   beforeEach(() => {
     sinon.stub(appShutdown, 'wire');
     sinon.stub(handlerHelpers, 'getIssuer').returns('testIssuer');
-    sinon.stub(handlerHelpers, 'getAppPublicSignature').resolves('public-signature');
-    sinon.stub(jwt, 'verify')
+    sinon
+      .stub(handlerHelpers, 'getAppPublicSignature')
+      .resolves('public-signature');
+    sinon
+      .stub(jwt, 'verify')
       .withArgs('valid-jwt-system', 'public-signature')
       .returns({
         payload: {
@@ -62,13 +65,14 @@ describe(__filename, () => {
     sinon.restore();
   });
 
-  const createExpectedOrid = (resourceId, resourceRider) => orid.v1.generate({
-    provider: `${process.env.ORID_PROVIDER_KEY || ''}`,
-    service: 'qs',
-    custom3: 1001,
-    resourceId,
-    resourceRider,
-  });
+  const createExpectedOrid = (resourceId, resourceRider) =>
+    orid.v1.generate({
+      provider: `${process.env.ORID_PROVIDER_KEY || ''}`,
+      service: 'qs',
+      custom3: 1001,
+      resourceId,
+      resourceRider,
+    });
 
   it('lists queues when queried', () => {
     // Arrange
@@ -86,9 +90,18 @@ describe(__filename, () => {
       .set('token', 'valid-jwt')
       .expect('content-type', /application\/json/)
       .expect(200, [
-        { name: 'one', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:one` },
-        { name: 'two', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:two` },
-        { name: 'three', orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:three` },
+        {
+          name: 'one',
+          orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:one`,
+        },
+        {
+          name: 'two',
+          orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:two`,
+        },
+        {
+          name: 'three',
+          orid: `orid:1:${process.env.ORID_PROVIDER_KEY || ''}:::1001:qs:three`,
+        },
       ]);
   });
 
@@ -136,35 +149,50 @@ describe(__filename, () => {
   });
 
   describe('creates queue', () => {
-    const buildQueueName = (name) => `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_${name}`;
+    const buildQueueName = (name) =>
+      `orid_1_${process.env.ORID_PROVIDER_KEY || ''}___1001_qs_${name}`;
 
     it('when queue does not exist it creates a queue with resource and DLQ', () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
       return supertest(app)
         .post('/v1/queue')
         .set('token', 'valid-jwt')
-        .send({ name: 'test', resource: 'orid:1::::1001:sm:test', dlq: createExpectedOrid('test-dlq') })
+        .send({
+          name: 'test',
+          resource: 'orid:1::::1001:sm:test',
+          dlq: createExpectedOrid('test-dlq'),
+        })
         .expect(201, {
           name: 'test',
           orid: createExpectedOrid('test'),
         })
         .then(() => {
           chai.expect(repoStubs.createQueue.callCount).to.equal(1);
-          chai.expect(repoStubs.createQueue.firstCall.args[0]).to.equal(buildQueueName('test'));
+          chai
+            .expect(repoStubs.createQueue.firstCall.args[0])
+            .to.equal(buildQueueName('test'));
           chai.expect(repoStubs.createQueue.firstCall.args[1]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[2]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[3]).to.equal();
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal(`queue-meta:${buildQueueName('test')}`);
-          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
-            resource: 'orid:1::::1001:sm:test',
-            dlq: createExpectedOrid('test-dlq'),
-          }));
+          chai
+            .expect(repoStubs.setValueForKey.firstCall.args[0])
+            .to.equal(`queue-meta:${buildQueueName('test')}`);
+          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(
+            JSON.stringify({
+              resource: 'orid:1::::1001:sm:test',
+              dlq: createExpectedOrid('test-dlq'),
+            }),
+          );
         });
     });
 
@@ -172,7 +200,11 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
@@ -186,12 +218,18 @@ describe(__filename, () => {
         })
         .then(() => {
           chai.expect(repoStubs.createQueue.callCount).to.equal(1);
-          chai.expect(repoStubs.createQueue.firstCall.args[0]).to.equal(buildQueueName('test'));
+          chai
+            .expect(repoStubs.createQueue.firstCall.args[0])
+            .to.equal(buildQueueName('test'));
           chai.expect(repoStubs.createQueue.firstCall.args[1]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[2]).to.equal();
           chai.expect(repoStubs.createQueue.firstCall.args[3]).to.equal();
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal(`queue-meta:${buildQueueName('test')}`);
-          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({}));
+          chai
+            .expect(repoStubs.setValueForKey.firstCall.args[0])
+            .to.equal(`queue-meta:${buildQueueName('test')}`);
+          chai
+            .expect(repoStubs.setValueForKey.firstCall.args[1])
+            .to.deep.equal(JSON.stringify({}));
         });
     });
 
@@ -199,14 +237,22 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
       return supertest(app)
         .post('/v1/queue')
         .set('token', 'valid-jwt')
-        .send({ name: 'test', resource: 'http://foo/bar/baz', dlq: createExpectedOrid('test-dlq') })
+        .send({
+          name: 'test',
+          resource: 'http://foo/bar/baz',
+          dlq: createExpectedOrid('test-dlq'),
+        })
         .expect(400, {
           message: 'It appears the resource is not a valid V1 ORID.',
         })
@@ -219,14 +265,22 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
       return supertest(app)
         .post('/v1/queue')
         .set('token', 'valid-jwt')
-        .send({ name: 'test', resource: createExpectedOrid('test'), dlq: 'asdf' })
+        .send({
+          name: 'test',
+          resource: createExpectedOrid('test'),
+          dlq: 'asdf',
+        })
         .expect(400, {
           message: 'It appears the dlq is not a valid V1 ORID.',
         })
@@ -239,7 +293,11 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('test')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('test'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
@@ -257,7 +315,11 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('test')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('test'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
@@ -266,7 +328,8 @@ describe(__filename, () => {
         .set('token', 'valid-jwt')
         .send({ name: 'test_queue' })
         .expect(400, {
-          message: 'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
+          message:
+            'Queue name invalid. Criteria: maximum length 50 characters, alphanumeric and hyphen only allowed.',
         });
     });
 
@@ -274,7 +337,11 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
@@ -283,7 +350,8 @@ describe(__filename, () => {
         .set('token', 'valid-jwt')
         .send({ name: 'test', resource: 'http://foo/bar/baz' })
         .expect(400, {
-          message: 'When using resource or dlq both resource and dlq must be provided.',
+          message:
+            'When using resource or dlq both resource and dlq must be provided.',
         })
         .then(() => {
           chai.expect(repoStubs.createQueue.callCount).to.equal(0);
@@ -294,7 +362,11 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.listQueues.resolves([buildQueueName('one'), buildQueueName('two'), buildQueueName('three')]);
+      repoStubs.listQueues.resolves([
+        buildQueueName('one'),
+        buildQueueName('two'),
+        buildQueueName('three'),
+      ]);
       repoStubs.createQueue.resolves(1);
 
       // Act / Assert
@@ -303,7 +375,8 @@ describe(__filename, () => {
         .set('token', 'valid-jwt')
         .send({ name: 'test', dlq: createExpectedOrid('test-dlq') })
         .expect(400, {
-          message: 'When using resource or dlq both resource and dlq must be provided.',
+          message:
+            'When using resource or dlq both resource and dlq must be provided.',
         })
         .then(() => {
           chai.expect(repoStubs.createQueue.callCount).to.equal(0);
@@ -322,15 +395,22 @@ describe(__filename, () => {
       return supertest(app)
         .post('/v1/queue/orid:1:mdsCloud:::1001:qs:test')
         .set('token', 'valid-jwt')
-        .send({ resource: 'orid:1:mdsCloud:::1001:sf:test', dlq: createExpectedOrid('test-dlq') })
+        .send({
+          resource: 'orid:1:mdsCloud:::1001:sf:test',
+          dlq: createExpectedOrid('test-dlq'),
+        })
         .expect(200)
         .then(() => {
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
-          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
-            other: 'value',
-            resource: 'orid:1:mdsCloud:::1001:sf:test',
-            dlq: createExpectedOrid('test-dlq'),
-          }));
+          chai
+            .expect(repoStubs.setValueForKey.firstCall.args[0])
+            .to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
+          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(
+            JSON.stringify({
+              other: 'value',
+              resource: 'orid:1:mdsCloud:::1001:sf:test',
+              dlq: createExpectedOrid('test-dlq'),
+            }),
+          );
         });
     });
 
@@ -338,7 +418,9 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      repoStubs.getValueForKey.resolves('{ "resource": "fooBar", "other": "value" }');
+      repoStubs.getValueForKey.resolves(
+        '{ "resource": "fooBar", "other": "value" }',
+      );
 
       // Act / Assert
       return supertest(app)
@@ -347,10 +429,14 @@ describe(__filename, () => {
         .send({ resource: null })
         .expect(200)
         .then(() => {
-          chai.expect(repoStubs.setValueForKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
-          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(JSON.stringify({
-            other: 'value',
-          }));
+          chai
+            .expect(repoStubs.setValueForKey.firstCall.args[0])
+            .to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
+          chai.expect(repoStubs.setValueForKey.firstCall.args[1]).to.deep.equal(
+            JSON.stringify({
+              other: 'value',
+            }),
+          );
         });
     });
 
@@ -386,8 +472,12 @@ describe(__filename, () => {
         .set('token', 'valid-jwt')
         .expect(204)
         .then(() => {
-          chai.expect(repoStubs.removeQueue.firstCall.args[0]).to.equal('orid_1_mdsCloud___1001_qs_test');
-          chai.expect(repoStubs.removeKey.firstCall.args[0]).to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
+          chai
+            .expect(repoStubs.removeQueue.firstCall.args[0])
+            .to.equal('orid_1_mdsCloud___1001_qs_test');
+          chai
+            .expect(repoStubs.removeKey.firstCall.args[0])
+            .to.equal('queue-meta:orid_1_mdsCloud___1001_qs_test');
         });
     });
 
@@ -575,7 +665,10 @@ describe(__filename, () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.createMessage.resolves('ok');
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty');
+      const invokerStub = sinon.stub(
+        resourceInvoker,
+        'invokeResourceUntilEmpty',
+      );
       invokerStub.returns();
 
       // Act / Assert
@@ -590,7 +683,9 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+      const invokerStub = sinon
+        .stub(resourceInvoker, 'invokeResourceUntilEmpty')
+        .returns();
 
       // Act / Assert
       return supertest(app)
@@ -610,7 +705,10 @@ describe(__filename, () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.removeMessage.resolves(1);
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty');
+      const invokerStub = sinon.stub(
+        resourceInvoker,
+        'invokeResourceUntilEmpty',
+      );
       invokerStub.returns();
 
       // Act / Assert
@@ -625,7 +723,9 @@ describe(__filename, () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.removeMessage.resolves(0);
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+      const invokerStub = sinon
+        .stub(resourceInvoker, 'invokeResourceUntilEmpty')
+        .returns();
 
       // Act / Assert
       return supertest(app)
@@ -643,7 +743,9 @@ describe(__filename, () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.removeMessage.resolves(0);
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+      const invokerStub = sinon
+        .stub(resourceInvoker, 'invokeResourceUntilEmpty')
+        .returns();
 
       // Act / Assert
       return supertest(app)
@@ -661,7 +763,9 @@ describe(__filename, () => {
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
       repoStubs.removeMessage.resolves(0);
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+      const invokerStub = sinon
+        .stub(resourceInvoker, 'invokeResourceUntilEmpty')
+        .returns();
 
       // Act / Assert
       return supertest(app)
@@ -678,7 +782,9 @@ describe(__filename, () => {
       // Arrange
       const app = src.buildApp();
       const repoStubs = getStubbedRepo();
-      const invokerStub = sinon.stub(resourceInvoker, 'invokeResourceUntilEmpty').returns();
+      const invokerStub = sinon
+        .stub(resourceInvoker, 'invokeResourceUntilEmpty')
+        .returns();
 
       // Act / Assert
       return supertest(app)
