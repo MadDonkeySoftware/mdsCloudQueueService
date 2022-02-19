@@ -17,7 +17,9 @@ const invokeResourceForOrid = async (resource, payload) => {
       return client.invokeFunction(resource, payload);
     }
     default:
-      throw new Error(`Service type: "${parsedOrid.service}" not supported for invocation.`);
+      throw new Error(
+        `Service type: "${parsedOrid.service}" not supported for invocation.`,
+      );
   }
 };
 
@@ -64,15 +66,15 @@ const invokeResourceUntilEmpty = async (qid) => {
 
     const pendingMessages = await repos.getQueueSize(qid);
     if (pendingMessages < 1) {
-      logger.trace({ pendingMessages }, 'No messages pending. Skipping metadata and lock fetch.');
+      logger.trace(
+        { pendingMessages },
+        'No messages pending. Skipping metadata and lock fetch.',
+      );
       return Promise.resolve();
     }
 
     try {
-      logger.trace(
-        { qid, metadata },
-        'Invoking resource',
-      );
+      logger.trace({ qid, metadata }, 'Invoking resource');
       const payload = await repos.getMessage(qid);
       try {
         await invokeResourceForOrid(meta.resource, payload.message);
@@ -93,7 +95,10 @@ const invokeResourceUntilEmpty = async (qid) => {
       );
     }
   } catch (err) {
-    logger.warn({ err }, 'A problem occurred while attempting to fire the metadata resource.');
+    logger.warn(
+      { err },
+      'A problem occurred while attempting to fire the metadata resource.',
+    );
   } finally {
     logger.trace({ qid }, `Releasing lock for ${qid}.`);
     await repos.releaseLock(lockKey);

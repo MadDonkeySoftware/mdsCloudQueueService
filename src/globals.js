@@ -13,15 +13,13 @@ const buildLogStreams = () => {
   }
 
   if (process.env.MDS_LOG_URL) {
-    logStreams.push(
-      {
-        stream: bunyanLogstashHttp.createLoggerStream({
-          loggingEndpoint: process.env.MDS_LOG_URL,
-          level: 'debug',
-          metadata: loggerMetadata,
-        }),
-      },
-    );
+    logStreams.push({
+      stream: bunyanLogstashHttp.createLoggerStream({
+        loggingEndpoint: process.env.MDS_LOG_URL,
+        level: 'debug',
+        metadata: loggerMetadata,
+      }),
+    });
   }
 
   return logStreams;
@@ -39,7 +37,10 @@ const logger = bunyan.createLogger({
  */
 const getLogger = () => logger;
 
-const delay = (timeout) => new Promise((resolve) => setTimeout(resolve, timeout));
+const delay = (timeout) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, timeout);
+  });
 
 module.exports = {
   buildLogStreams,
