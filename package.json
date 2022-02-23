@@ -33,7 +33,7 @@
     "lodash": "^4.17.21",
     "node-redis-lock": "^1.0.1",
     "parse-redis-url": "0.0.2",
-    "redis": "^4.0.3",
+    "redis": "^4.0.4",
     "rsmq": "^0.12.4",
     "url-join": "^4.0.1"
   },
