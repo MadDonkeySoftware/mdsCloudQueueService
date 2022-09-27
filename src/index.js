@@ -27,7 +27,9 @@ const buildApp = () => {
     expressApp.use('/v1/', handlersV1);
   };
 
-  app.use(requestLogger);
+  if (process.env.MDS_LOG_ALL_REQUESTS === 'true') {
+    app.use(requestLogger);
+  }
   app.use(commonResponseSetup);
   app.use(express.json());
   app.use(express.text());
