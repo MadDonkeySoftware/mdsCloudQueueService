@@ -1,4 +1,6 @@
 const os = require('os');
+// NOTE: Reverted redis version until TS upgrade
+// NOTE: change approach to use ioredis and redlock?
 const redis = require('redis');
 const Lock = require('node-redis-lock');
 const RedisSMQ = require('rsmq');
