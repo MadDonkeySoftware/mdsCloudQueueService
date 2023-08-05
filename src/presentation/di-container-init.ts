@@ -15,7 +15,7 @@ import { resourceInvokerCallback } from './functions/resource-invoker-callback';
  * @param args.diContainer The DI container to configure
  * @param args.server The fastify server instance
  */
-export async function diContainerInit({
+export function diContainerInit({
   diContainer,
   server,
 }: {
