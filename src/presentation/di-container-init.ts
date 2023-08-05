@@ -1,7 +1,7 @@
 import { Cradle } from '@fastify/awilix';
 import { asClass, asFunction, AwilixContainer, Lifetime } from 'awilix';
 import config from 'config';
-import * as redis from 'redis';
+import { createClient } from 'redis';
 import RedisSMQ from 'rsmq';
 import { Logic } from '../core/classes/logic';
 import { QueueRepoRedis } from '../infrastructure/repos/queue-repo-redis';
@@ -43,7 +43,7 @@ export async function diContainerInit({
 
     redisClient: asFunction(
       () => {
-        const client = redis.createClient({
+        const client = createClient({
           url: config.get<string>('redisUrl'),
         });
         return client;

@@ -1,6 +1,6 @@
 import { asFunction, Lifetime } from 'awilix';
 import { FastifyInstance, InjectOptions } from 'fastify';
-import * as src from '../../..';
+import { buildApp } from '../../../index';
 import {
   QueueExistsError,
   QueueNotFoundError,
@@ -45,7 +45,7 @@ describe('queues controller test', () => {
   }
 
   beforeAll(async () => {
-    app = await src.buildApp(async ({ diContainer }) => {
+    app = await buildApp(async ({ diContainer }) => {
       diContainer.register({
         logic: asFunction(() => logicMock, {
           lifetime: Lifetime.SCOPED,

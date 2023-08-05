@@ -1,6 +1,7 @@
 version = 1
 test_patterns = [
-    "*.test.js"
+    "*.test.js",
+    "*.spec.js"
 ]
 
 [[analyzers]]

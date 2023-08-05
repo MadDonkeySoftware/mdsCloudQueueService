@@ -1,4 +1,4 @@
-import * as jsonwebtoken from 'jsonwebtoken';
+import * as jsonwebtoken from 'jsonwebtoken'; // skipcq: JS-C1003
 import { Jwt } from 'jsonwebtoken';
 import { validateToken } from '../validate-token';
 import { FastifyReply, FastifyRequest } from 'fastify';

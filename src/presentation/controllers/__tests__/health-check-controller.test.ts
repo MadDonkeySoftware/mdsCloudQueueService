@@ -1,5 +1,5 @@
-import * as src from '../..';
 import { FastifyInstance, InjectOptions } from 'fastify';
+import { buildApp } from '../../index';
 
 describe('healthCheckController test', () => {
   let app: FastifyInstance;
@@ -15,7 +15,7 @@ describe('healthCheckController test', () => {
   }
 
   beforeAll(async () => {
-    app = await src.buildApp();
+    app = await buildApp();
   });
 
   afterAll(() => {
