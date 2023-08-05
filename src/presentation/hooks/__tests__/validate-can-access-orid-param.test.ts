@@ -103,7 +103,7 @@ describe('validate-can-access-orid-param', () => {
     expect(done).toHaveBeenCalledWith();
   });
 
-  it('raises error and replies with bad request when invalid orid in params', async () => {
+  it('raises error and replies with bad request when invalid orid in params', () => {
     // Arrange
     const request: {
       parsedToken: IdentityJwt | undefined;

@@ -15,7 +15,7 @@ export function validateCanAccessOridParam(
     const parsedOrid = v1.parse(orid!);
 
     const tokenAccountId = request.parsedToken?.payload.accountId;
-    if (parsedOrid.custom3 !== tokenAccountId && '1' !== tokenAccountId) {
+    if (parsedOrid.custom3 !== tokenAccountId && tokenAccountId !== '1') {
       logger.debug(
         { tokenAccountId, requestAccount: parsedOrid.custom3 },
         'Insufficient privilege for request',

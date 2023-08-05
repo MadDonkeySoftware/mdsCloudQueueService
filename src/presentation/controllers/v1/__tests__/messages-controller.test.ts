@@ -36,12 +36,13 @@ describe('messages controller test', () => {
   }
 
   beforeAll(async () => {
-    app = await buildApp(async ({ diContainer }) => {
+    app = await buildApp(({ diContainer }) => {
       diContainer.register({
         logic: asFunction(() => logicMock, {
           lifetime: Lifetime.SCOPED,
         }),
       });
+      return Promise.resolve();
     });
   });
 

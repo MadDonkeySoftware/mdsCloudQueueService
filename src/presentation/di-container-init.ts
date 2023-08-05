@@ -98,4 +98,6 @@ export async function diContainerInit({
       },
     }),
   });
+
+  return Promise.resolve();
 }

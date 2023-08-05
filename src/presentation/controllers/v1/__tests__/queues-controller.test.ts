@@ -45,12 +45,13 @@ describe('queues controller test', () => {
   }
 
   beforeAll(async () => {
-    app = await buildApp(async ({ diContainer }) => {
+    app = await buildApp(({ diContainer }) => {
       diContainer.register({
         logic: asFunction(() => logicMock, {
           lifetime: Lifetime.SCOPED,
         }),
       });
+      return Promise.resolve();
     });
   });
 
@@ -100,12 +101,13 @@ describe('queues controller test', () => {
         'orid:1:testIssuer:::1000:qs:queue1',
         'orid:1:testIssuer:::1000:qs:queue2',
       ]);
-      mockValidateToken.mockImplementationOnce(async (req) => {
+      mockValidateToken.mockImplementationOnce((req) => {
         req.parsedToken = {
           payload: {
             accountId: '1',
           },
         } as IdentityJwt;
+        return Promise.resolve();
       });
 
       // Act

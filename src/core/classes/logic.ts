@@ -33,7 +33,7 @@ export class Logic {
     });
   }
 
-  async listQueues(accountId?: string) {
+  listQueues(accountId?: string) {
     return this.#queueRepo.listQueues(accountId);
   }
 
