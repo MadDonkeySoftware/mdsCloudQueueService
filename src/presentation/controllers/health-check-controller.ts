@@ -19,9 +19,11 @@ export function healthCheckController(
         },
       },
     },
-    (request, response) => {
+    async (request, response) => {
+      const statuses = await request.services.logic.healthChecks();
+
       response.status(200);
-      response.send({ status: 'OK' } as GetHealthResponse);
+      response.send({ serverStatus: 'OK', ...statuses } as GetHealthResponse);
     },
   );
 

@@ -12,6 +12,7 @@ describe('logic', () => {
     createMessage: jest.fn(),
     getMessage: jest.fn(),
     removeMessage: jest.fn().mockResolvedValue(1),
+    healthChecks: jest.fn(),
   };
 
   beforeAll(() => {
@@ -419,6 +420,26 @@ describe('logic', () => {
       await expect(logic.removeMessage(args)).resolves.not.toThrow();
       expect(mockQueueRepo.removeMessage).toHaveBeenCalledTimes(1);
       expect(mockQueueRepo.removeMessage).toHaveBeenCalledWith(args);
+    });
+  });
+
+  describe('healthChecks', () => {
+    it('returns health checks', async () => {
+      // Arrange
+      mockQueueRepo.healthChecks.mockResolvedValueOnce({
+        redisStatus: 'OK',
+        queueStatus: 'OK',
+      });
+
+      // Act
+      const healthChecks = await logic.healthChecks();
+
+      // Assert
+      expect(healthChecks).toEqual({
+        redisStatus: 'OK',
+        queueStatus: 'OK',
+      });
+      expect(mockQueueRepo.healthChecks).toHaveBeenCalledTimes(1);
     });
   });
 });

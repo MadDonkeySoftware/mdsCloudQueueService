@@ -1,5 +1,6 @@
 import RedisSMQ from 'rsmq';
 import { RedisClientType } from 'redis';
+import { BaseLogger } from 'pino';
 import { QueueRepoRedis } from '../repos/queue-repo-redis';
 
 describe('queue-repo-redis', () => {
@@ -10,6 +11,7 @@ describe('queue-repo-redis', () => {
     set: jest.fn().mockResolvedValue(null),
     get: jest.fn(),
     del: jest.fn().mockResolvedValue(1),
+    ping: jest.fn(),
   };
   const mockRedisSmq = {
     createQueueAsync: jest.fn(),
@@ -20,11 +22,15 @@ describe('queue-repo-redis', () => {
     receiveMessageAsync: jest.fn(),
     deleteMessageAsync: jest.fn(),
   };
+  const mockLogger = {
+    warn: jest.fn(),
+  };
 
   beforeAll(() => {
     queueRepo = new QueueRepoRedis({
       redisClient: mockRedisClient as unknown as RedisClientType,
       redisSmq: mockRedisSmq as unknown as RedisSMQ,
+      logger: mockLogger as unknown as BaseLogger,
     });
     mockRedisClient.connect.mockImplementation(() => {
       mockRedisClient.isReady = true;
@@ -370,6 +376,57 @@ describe('queue-repo-redis', () => {
       expect(mockRedisSmq.deleteMessageAsync).toHaveBeenCalledWith({
         qname: 'orid_1_testProvider___account_qs_test-queue-1',
         id: 'test-message-id',
+      });
+    });
+  });
+
+  describe('healthChecks', () => {
+    it('returns healthy when redis client and redis smq are responding', async () => {
+      // Arrange
+      mockRedisClient.ping.mockResolvedValueOnce('PONG');
+      mockRedisSmq.listQueuesAsync.mockResolvedValueOnce([]);
+
+      // Act
+      const healthChecks = await queueRepo.healthChecks();
+
+      // Assert
+      expect(healthChecks).toEqual({
+        queueStatus: 'OK',
+        redisStatus: 'OK',
+      });
+    });
+
+    it('returns error when service under test throws error', async () => {
+      // Arrange
+      mockRedisClient.ping.mockRejectedValueOnce(new Error('test-error'));
+      mockRedisSmq.listQueuesAsync.mockResolvedValueOnce([]);
+
+      // Act
+      const healthChecks = await queueRepo.healthChecks();
+
+      // Assert
+      expect(healthChecks).toEqual({
+        queueStatus: 'OK',
+        redisStatus: 'ERROR',
+      });
+    });
+
+    it('returns error when service under test is not responding', async () => {
+      // Arrange
+      mockRedisClient.ping.mockResolvedValueOnce('PONG');
+      mockRedisSmq.listQueuesAsync.mockImplementation(() => {
+        return new Promise(() => {
+          /* never returns */
+        });
+      });
+
+      // Act
+      const healthChecks = await queueRepo.healthChecks(1);
+
+      // Assert
+      expect(healthChecks).toEqual({
+        queueStatus: 'ERROR',
+        redisStatus: 'OK',
       });
     });
   });

@@ -1,4 +1,5 @@
 import config from 'config';
+import { v1 as oridV1 } from '@maddonkeysoftware/orid-node';
 import {
   QueueRepo,
   CreateQueueArgs,
@@ -9,7 +10,6 @@ import {
   GetMessageArgs,
   RemoveMessageArgs,
 } from '../interfaces/queue-repo';
-import { v1 as oridV1 } from '@maddonkeysoftware/orid-node';
 import {
   InvalidNameError,
   QueueExistsError,
@@ -132,5 +132,9 @@ export class Logic {
 
   removeMessage(args: RemoveMessageArgs) {
     return this.#queueRepo.removeMessage(args);
+  }
+
+  healthChecks() {
+    return this.#queueRepo.healthChecks();
   }
 }

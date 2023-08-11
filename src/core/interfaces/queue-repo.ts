@@ -57,6 +57,11 @@ export type RemoveMessageArgs = {
   messageId: string;
 };
 
+export type HealthChecksResult = {
+  queueStatus: string;
+  redisStatus: string;
+};
+
 export interface QueueRepo {
   createQueue: (args: CreateQueueArgs) => Promise<void>;
   listQueues: (account?: string) => Promise<string[]>;
@@ -67,4 +72,6 @@ export interface QueueRepo {
   createMessage: (args: CreateMessageArgs) => Promise<void>;
   getMessage: (args: GetMessageArgs) => Promise<GetMessageResult | null>;
   removeMessage: (args: RemoveMessageArgs) => Promise<number>;
+
+  healthChecks: () => Promise<HealthChecksResult>;
 }
