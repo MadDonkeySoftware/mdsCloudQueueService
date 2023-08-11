@@ -8,7 +8,6 @@ import { QueueRepoRedis } from '../infrastructure/repos/queue-repo-redis';
 import { IntervalInvoker } from '../core/classes/interval-invoker';
 import { FastifyInstance } from 'fastify';
 import { resourceInvokerCallback } from './functions/resource-invoker-callback';
-import { BaseLogger } from 'pino';
 
 /**
  * Documentation available at https://github.com/jeffijoe/awilix
