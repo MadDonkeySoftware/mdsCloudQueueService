@@ -162,9 +162,15 @@ describe('validate-token', () => {
     const request: {
       parsedToken: IdentityJwt | undefined;
       headers: Record<string, string>;
+      log: {
+        debug: (arg: unknown) => void;
+      };
     } = {
       parsedToken: undefined,
       headers: {},
+      log: {
+        debug: jest.fn(),
+      },
     };
     const reply: {
       status: () => void;

@@ -1,31 +1,38 @@
 import { RedisClientType } from 'redis';
 import RedisSMQ from 'rsmq';
 import { v1 as oridV1 } from '@maddonkeysoftware/orid-node';
+import { BaseLogger } from 'pino';
 import {
   CreateMessageArgs,
   CreateQueueArgs,
   GetMessageArgs,
   GetMessageResult,
   GetQueueDetailsArgs,
+  HealthChecksResult,
   QueueRepo,
   RemoveMessageArgs,
   RemoveQueueArgs,
   UpdateQueueArgs,
 } from '../../core/interfaces/queue-repo';
+import { HealthCheckResult } from '../../core/types/health-check-result';
 
 export class QueueRepoRedis implements QueueRepo {
   #redisClientInternal: RedisClientType;
   #redisSmqInternal: RedisSMQ;
+  #logger: BaseLogger;
 
   constructor({
     redisClient,
     redisSmq,
+    logger,
   }: {
     redisClient: RedisClientType;
     redisSmq: RedisSMQ;
+    logger: BaseLogger;
   }) {
     this.#redisClientInternal = redisClient;
     this.#redisSmqInternal = redisSmq;
+    this.#logger = logger;
   }
 
   get #redisClient() {
@@ -169,5 +176,44 @@ export class QueueRepoRedis implements QueueRepo {
       qname: escapedName,
       id: args.messageId,
     });
+  }
+
+  async healthChecks(timeout = 3000): Promise<HealthChecksResult> {
+    const runHealthCheck = async (fn: () => Promise<void>) => {
+      let status = HealthCheckResult.INDETERMINANT;
+      const wrapper = async () => {
+        await fn();
+        status = HealthCheckResult.OK;
+      };
+      try {
+        await Promise.race([
+          wrapper(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), timeout),
+          ),
+        ]);
+      } catch (err) {
+        this.#logger.warn({ err }, 'health check failed');
+        status = HealthCheckResult.ERROR;
+      }
+
+      return status;
+    };
+
+    const healthCheckRedis = async () => {
+      const redis = await this.#redisClient;
+      await redis.ping();
+    };
+    const healthCheckQueues = async () => {
+      await this.listQueues();
+    };
+
+    const redisStatus = await runHealthCheck(healthCheckRedis);
+    const queueStatus = await runHealthCheck(healthCheckQueues);
+
+    return {
+      redisStatus,
+      queueStatus,
+    };
   }
 }

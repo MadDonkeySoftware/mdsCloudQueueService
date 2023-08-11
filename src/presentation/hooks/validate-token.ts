@@ -10,6 +10,7 @@ export async function validateToken(
 ) {
   const token = request.headers.token as string | undefined;
   if (!token) {
+    request.log.debug('Request missing token.');
     reply.status(403);
     reply.header('content-type', 'text/plain');
     reply.send('Please include authentication token in header "token"');

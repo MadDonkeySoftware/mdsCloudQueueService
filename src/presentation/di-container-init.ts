@@ -62,8 +62,19 @@ export function diContainerInit({
     ),
 
     redisSmq: asFunction(
-      ({ redisClient }) => {
-        return new RedisSMQ({ client: redisClient, ns: 'rsmq' });
+      () => {
+        // TODO: Find a better library or get off redis for queues all-together.
+        // HACK: This library does not like the client supplied and is fairly out of date.
+        // When supplying a client that doesn't have a constructor named "RedisClient" it
+        // will use an internal localhost connection. Since we don't want that we must
+        // provide the host and port directly.
+        const [host, port] = /redis:\/\/([^:]+):(\d+)/
+          .exec(config.get<string>('redisUrl'))
+          ?.slice(1) as [string, string];
+        return new RedisSMQ({
+          host,
+          port: Number(port),
+        });
       },
       {
         lifetime: Lifetime.SCOPED,
