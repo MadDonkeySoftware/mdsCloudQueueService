@@ -31,7 +31,7 @@
     "@maddonkeysoftware/mds-cloud-sdk-node": "^0.2.9",
     "@maddonkeysoftware/orid-node": "^0.1.2",
     "@sinclair/typebox": "^0.32.0",
-    "awilix": "^8.0.1",
+    "awilix": "^9.0.0",
     "bluebird": "^3.7.2",
     "bunyan": "^1.8.15",
     "config": "^3.3.9",
