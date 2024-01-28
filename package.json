@@ -38,7 +38,7 @@
     "fastify": "^4.20.0",
     "jsonwebtoken": "^9.0.0",
     "lodash": "^4.17.21",
-    "mds-log-pump": "^0.0.5",
+    "mds-log-pump": "^0.0.6",
     "redis": "^4.6.7",
     "rsmq": "^0.12.4",
     "url-join": "^5.0.0"
