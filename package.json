@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/MadDonkeySoftware/mdsCloudQueueService#readme",
   "dependencies": {
-    "@fastify/awilix": "^3.1.0",
+    "@fastify/awilix": "^5.0.0",
     "@fastify/swagger": "^8.8.0",
     "@fastify/swagger-ui": "^1.9.3",
     "@fastify/type-provider-typebox": "^3.3.0",
