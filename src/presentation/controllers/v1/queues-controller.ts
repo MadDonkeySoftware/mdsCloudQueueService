@@ -66,8 +66,7 @@ export function queuesController(
         tags: ['Queues'],
         body: CreateQueueRequestBodySchema,
         response: {
-          200: CreateQueueResponseBodySchema,
-          201: CreateQueueResponseBodySchema,
+          '2xx': CreateQueueResponseBodySchema,
         },
       },
     },
