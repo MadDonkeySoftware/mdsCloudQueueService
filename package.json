@@ -27,7 +27,7 @@
     "@fastify/awilix": "^3.1.0",
     "@fastify/swagger": "^8.8.0",
     "@fastify/swagger-ui": "^1.9.3",
-    "@fastify/type-provider-typebox": "^3.3.0",
+    "@fastify/type-provider-typebox": "^5.0.0",
     "@maddonkeysoftware/mds-cloud-sdk-node": "^0.2.9",
     "@maddonkeysoftware/orid-node": "^0.1.2",
     "@sinclair/typebox": "^0.32.0",
